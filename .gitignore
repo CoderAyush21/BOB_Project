@@ -1,0 +1,18 @@
+# Secrets — never commit (IBM Cloud keys can get your account suspended)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+credentials*.json
+apikey*
+
+# Generated
+demo-repo/
+antigens-raw.md
+/results*.json
+/report*.html
+node_modules/
+__pycache__/
+.DS_Store
+prototype-output/

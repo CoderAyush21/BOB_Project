@@ -1,0 +1,141 @@
+{
+  "_note": "Reference output for the demo repo — what Bob should produce in step 2. Use it to sanity-check Bob, or as a fallback for a live demo.",
+  "antigens": [
+    {
+      "id": "A41",
+      "source_commit": "fix: pagination dropped the last item of every page (#41)",
+      "title": "#41 Off-by-one in slice end",
+      "pattern": "slice(start, start + n - 1) drops the last element of each page",
+      "signatures": {
+        "lang": "javascript",
+        "code": [
+          {
+            "regex": "\\.slice\\([^)]*[+-]\\s*1\\s*\\)",
+            "explain": "slice() end adjusted by 1: check that full pages keep their last item"
+          }
+        ],
+        "errors": [
+          "(last|final)\\s+(item|row|record|element)s?\\s+(is\\s+|are\\s+)?(missing|dropped|lost)",
+          "page\\s+\\d+\\s+(has|shows)\\s+\\d+\\s+items?"
+        ],
+        "fix_hint": "The end index of slice() is exclusive, so use slice(start, start + size) with no - 1.",
+        "example": {
+          "before": "items.slice(start, start + size - 1)",
+          "after": "items.slice(start, start + size)"
+        },
+        "antibody": "Concatenate every page for many list and page sizes, and assert the result equals the full list."
+      }
+    },
+    {
+      "id": "A57",
+      "source_commit": "fix: crash when customer has no address (#57)",
+      "title": "#57 Missing null guard on nested customer field",
+      "pattern": "customer.<obj>.<field> without optional chaining / default",
+      "postmortem": "docs/postmortems/2026-04-invoice-run-crash.md",
+      "unfinished_followups": [
+        "Add a regression test for customers with no address",
+        "Audit other code that reads nested customer fields"
+      ],
+      "signatures": {
+        "lang": "javascript",
+        "code": [
+          {
+            "regex": "\\b(customer|user|account|client|order)\\.(address|shipping|billing|contact|profile)\\.\\w+",
+            "explain": "nested customer field read without a null guard (?.)"
+          }
+        ],
+        "errors": [
+          "Cannot read propert(y|ies) of (undefined|null) \\(reading '\\w+'\\)",
+          "undefined is not an object \\(evaluating '\\w+\\.\\w+"
+        ],
+        "fix_hint": "Customers imported from other systems can lack nested objects. Use optional chaining with a default: customer.address?.city ?? 'Unknown'.",
+        "example": {
+          "before": "return customer.address.city;",
+          "after": "return customer.address?.city ?? 'Unknown';"
+        },
+        "antibody": "Call every reader of nested customer fields with {}, {field: null} and {field: undefined}."
+      }
+    },
+    {
+      "id": "A63",
+      "source_commit": "fix: invoice totals off by a cent due to float math (#63)",
+      "title": "#63 Float money math",
+      "pattern": "summing currency as floats instead of integer cents",
+      "signatures": {
+        "lang": "javascript",
+        "code": [
+          {
+            "regex": "reduce\\(\\s*\\(\\s*\\w+\\s*,\\s*\\w+\\s*\\)\\s*=>\\s*\\w+\\s*\\+\\s*\\w+\\.(price|amount|total|cost|fee)\\b(?!\\s*\\*\\s*100)",
+            "explain": "money summed as floating-point numbers instead of integer cents"
+          },
+          {
+            "regex": "^(?!.*Math\\.round).*\\b(price|amount|total|cost|fee)\\w*\\s*\\*\\s*(qty|quantity|rate)\\b",
+            "explain": "money multiplied as floats without rounding to cents"
+          }
+        ],
+        "errors": [
+          "0\\.30000000000000004",
+          "\\b\\d+\\.\\d*?(0000000\\d|9999999)\\d*\\b",
+          "off by (a|one) cent",
+          "total(s)? (is|are) (wrong|off)"
+        ],
+        "fix_hint": "Convert to integer cents first: Math.round(price * 100) * qty, sum the cents, and divide by 100 once at the end.",
+        "example": {
+          "before": "lines.reduce((s, l) => s + l.price * l.qty, 0)",
+          "after": "lines.reduce((s, l) => s + Math.round(l.price * 100) * l.qty, 0) / 100"
+        },
+        "antibody": "Sum every cent value from 0.01 to 0.99, alone and in pairs, and assert exact results."
+      }
+    }
+  ],
+  "mutants": [
+    {
+      "id": "M1",
+      "antigen": "A41",
+      "file": "src/paginate.js",
+      "find": "start + size)",
+      "replace": "start + size - 1)",
+      "why": "Exact revert of the original #41 fix"
+    },
+    {
+      "id": "M2",
+      "antigen": "A41",
+      "file": "src/reports.js",
+      "find": "from + perPage)",
+      "replace": "from + perPage - 1)",
+      "why": "Same off-by-one pattern, new code: reportPage() written after the fix"
+    },
+    {
+      "id": "M3",
+      "antigen": "A57",
+      "file": "src/customers.js",
+      "find": "customer.address?.city ?? 'Unknown'",
+      "replace": "customer.address.city",
+      "why": "Exact revert of #57 — the fix shipped without a regression test"
+    },
+    {
+      "id": "M4",
+      "antigen": "A57",
+      "file": "src/reports.js",
+      "find": "customer.shipping?.city ?? 'Unknown'",
+      "replace": "customer.shipping.city",
+      "why": "Same missing-null-guard pattern on the new shipping address field"
+    },
+    {
+      "id": "M5",
+      "antigen": "A63",
+      "file": "src/money.js",
+      "find": "const cents = lines.reduce((sum, l) => sum + Math.round(l.price * 100) * l.qty, 0);\n  return cents / 100;",
+      "replace": "return lines.reduce((sum, l) => sum + l.price * l.qty, 0);",
+      "why": "Exact revert of #63"
+    },
+    {
+      "id": "M6",
+      "antigen": "A63",
+      "file": "src/reports.js",
+      "find": "const cents = lines.reduce((sum, l) => sum + Math.round(l.amount * rate * 100), 0);\n  return cents / 100;",
+      "replace": "return lines.reduce((sum, l) => sum + l.amount * rate, 0);",
+      "why": "Same float-money pattern in the new taxTotal()"
+    }
+  ]
+}

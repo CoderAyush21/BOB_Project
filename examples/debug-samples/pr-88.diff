@@ -1,0 +1,26 @@
+diff --git a/src/refunds.js b/src/refunds.js
+new file mode 100644
+--- /dev/null
++++ b/src/refunds.js
+@@ -0,0 +1,11 @@
++// Refunds — added in PR #88.
++export function refundTotal(lines) {
++  return lines.reduce((sum, l) => sum + l.amount, 0);
++}
++
++export function refundContact(customer) {
++  return customer.contact.email;
++}
++
++export const PAGE = 20;
++export const pageOf = (rows, p) => rows.slice(p * PAGE, p * PAGE + PAGE);
+diff --git a/src/paginate.js b/src/paginate.js
+--- a/src/paginate.js
++++ b/src/paginate.js
+@@ -1,4 +1,5 @@
+ export function page(items, pageNo, size) {
+   const start = pageNo * size;
+-  return items.slice(start, start + size - 1);
++  // fixed in #41
++  return items.slice(start, start + size);
+ }

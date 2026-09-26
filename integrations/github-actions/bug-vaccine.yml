@@ -1,0 +1,91 @@
+# Bug Vaccine: PR check for GitHub Actions
+#
+# Copy to .github/workflows/bug-vaccine.yml in YOUR repo. Prerequisites:
+#   1. Run `python bugvaccine.py init . --test "<cmd>"`, then do the Bob phases,
+#      so that .bugvaccine/config.json and .bugvaccine/mutants.json are committed.
+#   2. Replace <OWNER>/bug-vaccine below with wherever the Bug Vaccine tool is hosted.
+#   3. Replace the "Set up your project" step with your normal CI setup.
+#
+# What it does on every pull request (one PR comment, two checks reported separately):
+#   1. compares every line the PR adds with known company bug signatures
+#      (.bugvaccine/company-knowledge.json from `bugvaccine.py learn`, else this repo's own patterns),
+#      so a brand-new file that repeats an old bug is flagged,
+#   2. re-injects stored historical-bug mutants in the files the PR changed,
+#   and fails the check if immunity drops below `min_immunity` in config.json, or a mutant has
+#   gone stale because the code it targets was rewritten. Add --fail-on-new-risks to the
+#   `pr` command to also fail when check 1 finds something.
+#
+# Not covered: new *variations* of old bugs that don't match a signature. That needs Bob
+# (or another agent) to run Phase 2 on the PR. See docs/USING-ON-YOUR-REPO.md.
+
+name: Bug Vaccine
+
+on:
+  pull_request:
+
+# Security notes
+#  - Least privilege: read the code, write only PR comments. No secrets are used.
+#  - The test command is fixed HERE (TEST_CMD), not read from the PR's .bugvaccine/config.json, so a PR
+#    can't swap in its own command. bugvaccine.py also refuses PRs that edit config.json (exit 3).
+#  - Pin third-party actions to a full commit SHA in production (Dependabot can keep them updated);
+#    tags are used below for readability.
+#  - `pull_request` (not `pull_request_target`) so fork PRs run with a read-only token and no secrets.
+permissions:
+  contents: read
+  pull-requests: write
+
+env:
+  TEST_CMD: "npm test --silent"   # <- your test command
+
+jobs:
+  vaccine:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0          # PR mode diffs against the base branch
+          persist-credentials: false
+
+      - uses: actions/checkout@v4
+        with:
+          repository: <OWNER>/bug-vaccine
+          path: .bugvaccine-tool
+          persist-credentials: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      # ── Set up your project: replace with your usual CI steps ────────────
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: npm ci
+      # ─────────────────────────────────────────────────────────────────────
+
+      - name: Run Bug Vaccine (PR mode)
+        id: vaccine
+        continue-on-error: true   # post the comment first, then fail below
+        env:
+          BASE_REF: ${{ github.base_ref }}   # passed via env, never interpolated into the script
+        run: python .bugvaccine-tool/bugvaccine.py pr . --base "origin/$BASE_REF" --test "$TEST_CMD"
+
+      - name: Add the comment to the job summary
+        if: always() && hashFiles('.bugvaccine/pr-comment.md') != ''
+        run: cat .bugvaccine/pr-comment.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Post PR comment
+        if: always() && hashFiles('.bugvaccine/pr-comment.md') != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          gh pr comment "$PR_NUMBER" --edit-last --body-file .bugvaccine/pr-comment.md \
+            || gh pr comment "$PR_NUMBER" --body-file .bugvaccine/pr-comment.md
+
+      - name: Enforce the gate
+        if: steps.vaccine.outcome == 'failure'
+        run: |
+          echo "Bug Vaccine gate failed. See the PR comment and the 'Run Bug Vaccine' step log."
+          exit 1

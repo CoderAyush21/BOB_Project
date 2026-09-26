@@ -1,0 +1,22 @@
+{
+  "_note": "PR-mode stand-in: what Bob's hunt produces for PR #88 (examples/pr-refunds/). run.py --changed-since keeps only mutants in files the PR changed.",
+  "antigens": [
+    { "id": "A57", "source_commit": "fix: crash when customer has no address (#57)",
+      "title": "#57 Missing null guard on nested customer field", "pattern": "customer.<obj>.<field> without optional chaining / default",
+      "postmortem": "docs/postmortems/2026-04-invoice-run-crash.md" },
+    { "id": "A63", "source_commit": "fix: invoice totals off by a cent due to float math (#63)",
+      "title": "#63 Float money math", "pattern": "summing currency as floats instead of integer cents" }
+  ],
+  "mutants": [
+    { "id": "P1", "antigen": "A63", "file": "src/refunds.js",
+      "find": "const cents = lines.reduce((sum, l) => sum + Math.round(l.amount * 100), 0);\n  return cents / 100;",
+      "replace": "return lines.reduce((sum, l) => sum + l.amount, 0);",
+      "why": "New refundTotal() sums money: the #63 float bug would go unnoticed here" },
+    { "id": "P2", "antigen": "A57", "file": "src/refunds.js",
+      "find": "customer.contact?.email ?? 'billing@invoice-kit.example'", "replace": "customer.contact.email",
+      "why": "New refundContact() reads a nested customer field: the #57 crash would go unnoticed here" },
+    { "id": "P3", "antigen": "A63", "file": "src/money.js",
+      "find": "Math.round(l.price * 100) * l.qty", "replace": "l.price * 100 * l.qty",
+      "why": "Existing code, not touched by this PR: PR mode skips it" }
+  ]
+}

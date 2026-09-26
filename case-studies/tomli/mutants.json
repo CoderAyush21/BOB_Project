@@ -1,0 +1,223 @@
+{
+  "_note": "Real-world case study on hukkin/tomli @ 5a77b12. Antigens and mutants written by Claude acting as a stand-in for IBM Bob, from tomli's real bug-fix history. Paths are relative to the tomli repo root.",
+  "antigens": [
+    {
+      "id": "T1",
+      "source_commit": "22834cf FIX: Raise an error for duplicate keys in inline tables",
+      "title": "Duplicate key silently overwrites",
+      "pattern": "assigning into a table without first checking the key is already defined",
+      "signatures": {
+        "lang": "python",
+        "code": [],
+        "errors": [
+          "[Dd]uplicate (inline table )?key",
+          "key .* (defined|declared) (twice|more than once)"
+        ],
+        "fix_hint": "Check `if key in table` before assigning, and raise the library's own decode error.",
+        "example": {
+          "before": "nest[key_stem] = value",
+          "after": "if key_stem in nest:\n    raise TOMLDecodeError(...)\nnest[key_stem] = value"
+        },
+        "antibody": "Parse documents that repeat a key (top level, dotted and inline) and assert the decode error."
+      }
+    },
+    {
+      "id": "T2",
+      "source_commit": "7094082 FIX: No error was raised when defining a table in a frozen namespace",
+      "title": "Frozen namespace not enforced",
+      "pattern": "a code path that creates/extends a table without checking the namespace is frozen (inline tables/arrays are immutable)"
+    },
+    {
+      "id": "T3",
+      "source_commit": "55e97ee, 653a1ef, 8d34a60 (three separate fixes)",
+      "title": "Internal exception leaks instead of TOMLDecodeError",
+      "pattern": "an internal KeyError/ValueError escapes to the caller instead of being converted to TOMLDecodeError",
+      "signatures": {
+        "lang": "python",
+        "code": [
+          {
+            "regex": "except\\s+(IndexError|OverflowError|AttributeError)\\s*:",
+            "explain": "narrow except clause: an internal KeyError/ValueError may escape to the caller"
+          }
+        ],
+        "errors": [
+          "Traceback[\\s\\S]*_parser\\.py[\\s\\S]*\\b(KeyError|ValueError|TypeError|IndexError)\\b"
+        ],
+        "fix_hint": "Parsers must convert internal errors into the public error type (TOMLDecodeError) at the boundary where they occur.",
+        "example": {
+          "before": "except IndexError:",
+          "after": "except KeyError:\n    raise TOMLDecodeError(\"Cannot overwrite a value\", src, pos) from None"
+        },
+        "antibody": "For each invalid-document case, assert the public error type, never a built-in exception."
+      }
+    },
+    {
+      "id": "T4",
+      "source_commit": "91df038 FIX: Raise if escaped Unicode character is not a Unicode scalar value (#27)",
+      "title": "Invalid Unicode escape accepted",
+      "pattern": "escaped code points validated only for range, not for surrogates (not a Unicode scalar value)",
+      "signatures": {
+        "lang": "python",
+        "code": [
+          {
+            "regex": "\\bchr\\(\\s*\\w+\\s*\\)",
+            "explain": "chr() on a parsed code point: validate it as a Unicode scalar value first"
+          }
+        ],
+        "errors": [
+          "chr\\(\\) arg not in range",
+          "surrogates not allowed",
+          "not a Unicode scalar value"
+        ],
+        "fix_hint": "Accept 0..0xD7FF and 0xE000..0x10FFFF only, and raise the decode error otherwise.",
+        "example": {
+          "before": "return chr(hex_int)",
+          "after": "if not is_unicode_scalar_value(hex_int):\n    raise TOMLDecodeError(...)\nreturn chr(hex_int)"
+        },
+        "antibody": "Test both sides of every boundary: 0xD7FF/0xD800, 0xDFFF/0xE000, 0x10FFFF/0x110000."
+      }
+    },
+    {
+      "id": "T5",
+      "source_commit": "9e56735 Error when dotted keys define values outside current table (#125)",
+      "title": "Dotted-key namespace flags not finalised",
+      "pattern": "flags for namespaces opened by dotted keys never applied, so later table headers can redefine them"
+    },
+    {
+      "id": "T6",
+      "source_commit": "e1fdb94 Limit number of parts of a key (#286)",
+      "title": "Unbounded key depth",
+      "pattern": "no limit on the number of dotted key parts (quadratic blow-up on hostile input)"
+    }
+  ],
+  "mutants": [
+    {
+      "id": "M1",
+      "antigen": "T1",
+      "file": "src/tomli/_parser.py",
+      "find": "raise TOMLDecodeError(f\"Duplicate inline table key {key_stem!r}\", src, pos)",
+      "replace": "pass",
+      "why": "Exact revert of 22834cf: duplicate inline-table keys accepted"
+    },
+    {
+      "id": "M2",
+      "antigen": "T1",
+      "file": "src/tomli/_parser.py",
+      "find": "    if key_stem in nest:\n        raise TOMLDecodeError(\"Cannot overwrite a value\", src, pos)\n    # Mark",
+      "replace": "    # Mark",
+      "why": "Same pattern in key_value_rule(): duplicate top-level keys silently overwrite"
+    },
+    {
+      "id": "M3",
+      "antigen": "T2",
+      "file": "src/tomli/_parser.py",
+      "find": " or out.flags.is_(key, Flags.FROZEN)",
+      "replace": "",
+      "why": "Exact revert of 7094082: [table] header allowed inside an inline table's namespace"
+    },
+    {
+      "id": "M4",
+      "antigen": "T2",
+      "file": "src/tomli/_parser.py",
+      "find": "    if out.flags.is_(key, Flags.FROZEN):\n        raise TOMLDecodeError(f\"Cannot mutate immutable namespace {key}\", src, pos)\n    # Free",
+      "replace": "    # Free",
+      "why": "Same pattern in create_list_rule(): [[array]] header appends into a frozen namespace"
+    },
+    {
+      "id": "M5",
+      "antigen": "T2",
+      "file": "src/tomli/_parser.py",
+      "find": "    if out.flags.is_(abs_key_parent, Flags.FROZEN):\n        raise TOMLDecodeError(\n            f\"Cannot mutate immutable namespace {abs_key_parent}\", src, pos\n        )\n",
+      "replace": "",
+      "why": "Same pattern in key_value_rule(): dotted key writes into an inline table"
+    },
+    {
+      "id": "M6",
+      "antigen": "T2",
+      "file": "src/tomli/_parser.py",
+      "find": "        if flags.is_(key, Flags.FROZEN):\n            raise TOMLDecodeError(f\"Cannot mutate immutable namespace {key}\", src, pos)\n",
+      "replace": "",
+      "why": "Same pattern inside parse_inline_table(): nested inline table mutated by a later dotted key"
+    },
+    {
+      "id": "M7",
+      "antigen": "T3",
+      "file": "src/tomli/_parser.py",
+      "find": "        out.data.get_or_create_nest(key)\n    except KeyError:",
+      "replace": "        out.data.get_or_create_nest(key)\n    except IndexError:",
+      "why": "create_dict_rule(): KeyError leaks when a [table] header overwrites a value"
+    },
+    {
+      "id": "M8",
+      "antigen": "T3",
+      "file": "src/tomli/_parser.py",
+      "find": "        out.data.append_nest_to_list(key)\n    except KeyError:",
+      "replace": "        out.data.append_nest_to_list(key)\n    except IndexError:",
+      "why": "create_list_rule(): KeyError leaks when [[array]] targets a non-list value"
+    },
+    {
+      "id": "M9",
+      "antigen": "T3",
+      "file": "src/tomli/_parser.py",
+      "find": "        nest = out.data.get_or_create_nest(abs_key_parent)\n    except KeyError:",
+      "replace": "        nest = out.data.get_or_create_nest(abs_key_parent)\n    except IndexError:",
+      "why": "key_value_rule(): KeyError leaks when a dotted key walks through a value"
+    },
+    {
+      "id": "M10",
+      "antigen": "T3",
+      "file": "src/tomli/_parser.py",
+      "find": "            nest = nested_dict.get_or_create_nest(key_parent, access_lists=False)\n        except KeyError:",
+      "replace": "            nest = nested_dict.get_or_create_nest(key_parent, access_lists=False)\n        except IndexError:",
+      "why": "Exact revert of 653a1ef: KeyError leaks from an inline table"
+    },
+    {
+      "id": "M11",
+      "antigen": "T3",
+      "file": "src/tomli/_parser.py",
+      "find": "        except ValueError as e:\n            raise TOMLDecodeError(\"Invalid date or datetime\"",
+      "replace": "        except OverflowError as e:\n            raise TOMLDecodeError(\"Invalid date or datetime\"",
+      "why": "Exact revert of 8d34a60: ValueError leaks for dates like 2021-02-30"
+    },
+    {
+      "id": "M12",
+      "antigen": "T3",
+      "file": "src/tomli/_parser.py",
+      "find": "            if not isinstance(cont, dict):\n                raise KeyError(\"There is no nest behind this key\")\n        return cont",
+      "replace": "        if not isinstance(cont, dict):\n            raise KeyError(\"There is no nest behind this key\")\n        return cont",
+      "why": "Exact revert of 55e97ee: nest check only after the loop, so deep paths through a value raise TypeError"
+    },
+    {
+      "id": "M13",
+      "antigen": "T4",
+      "file": "src/tomli/_parser.py",
+      "find": "(0 <= codepoint <= 55295) or (57344 <= codepoint <= 1114111)",
+      "replace": "0 <= codepoint <= 1114111",
+      "why": "Range-only check: surrogate escapes like \\uD800 accepted"
+    },
+    {
+      "id": "M14",
+      "antigen": "T4",
+      "file": "src/tomli/_parser.py",
+      "find": "    if not is_unicode_scalar_value(hex_int):",
+      "replace": "    if False:",
+      "why": "Exact revert of 91df038: no validation at all (surrogates accepted, ValueError leaks for > 0x10FFFF)"
+    },
+    {
+      "id": "M15",
+      "antigen": "T5",
+      "file": "src/tomli/_parser.py",
+      "find": "            out.flags.finalize_pending()\n",
+      "replace": "",
+      "why": "Revert of #125's mechanism: dotted-key namespaces never frozen, so a later [table] can redefine them"
+    },
+    {
+      "id": "M16",
+      "antigen": "T6",
+      "file": "src/tomli/_parser.py",
+      "find": "        if len(key) > MAX_KEY_PARTS:",
+      "replace": "        if False:",
+      "why": "Exact revert of #286: unlimited key parts"
+    }
+  ]
+}

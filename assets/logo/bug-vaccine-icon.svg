@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32" role="img" aria-label="Bug Vaccine">
+  <!-- Compact mark for favicons and small sizes: 2x2 plate, three caught, one slipping through. -->
+  <path d="M16 1.5 28.5 5.5v10C28.5 23 23.5 28 16 30.8 8.5 28 3.5 23 3.5 15.5v-10Z" fill="#2456A6"/>
+  <circle cx="11.5" cy="11.5" r="3.6" fill="#5BD394"/>
+  <circle cx="20.5" cy="11.5" r="3.6" fill="#5BD394"/>
+  <circle cx="11.5" cy="20.3" r="3.6" fill="#5BD394"/>
+  <circle cx="20.5" cy="20.3" r="3.6" fill="#FF8B7E"/>
+</svg>

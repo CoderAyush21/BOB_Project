@@ -1,0 +1,32 @@
+{
+  "_note": "HELD-OUT mutants: different re-injections of the same antigens, generated separately and NEVER shown to whoever writes the antibody tests. Immunity on this set shows whether the antibodies generalise or just memorised the first mutants. In the real run a separate Bob subagent generates this set (bob-prompts/04-holdout.md).",
+  "antigens": [
+    { "id": "A41", "source_commit": "fix: pagination dropped the last item of every page (#41)",
+      "title": "#41 Off-by-one in slice end", "pattern": "slice(start, start + n - 1) drops the last element of each page" },
+    { "id": "A57", "source_commit": "fix: crash when customer has no address (#57)",
+      "title": "#57 Missing null guard on nested customer field", "pattern": "customer.<obj>.<field> without optional chaining / default",
+      "postmortem": "docs/postmortems/2026-04-invoice-run-crash.md" },
+    { "id": "A63", "source_commit": "fix: invoice totals off by a cent due to float math (#63)",
+      "title": "#63 Float money math", "pattern": "summing currency as floats instead of integer cents" }
+  ],
+  "mutants": [
+    { "id": "H1", "antigen": "A41", "file": "src/paginate.js",
+      "find": "const start = pageNo * size;", "replace": "const start = (pageNo - 1) * size;",
+      "why": "Off-by-one on the page start instead of the page end" },
+    { "id": "H2", "antigen": "A41", "file": "src/reports.js",
+      "find": "from + perPage)", "replace": "Math.min(from + perPage, rows.length - 1))",
+      "why": "Off-by-one that only drops the last row of the final page" },
+    { "id": "H3", "antigen": "A57", "file": "src/customers.js",
+      "find": "customer.address?.city", "replace": "customer.address.city",
+      "why": "Guard removed but the 'Unknown' default kept — still crashes when address is missing" },
+    { "id": "H4", "antigen": "A57", "file": "src/reports.js",
+      "find": "customer.shipping?.city", "replace": "customer.shipping.city",
+      "why": "Same partial-guard variant on the shipping address" },
+    { "id": "H5", "antigen": "A63", "file": "src/money.js",
+      "find": "Math.round(l.price * 100) * l.qty", "replace": "l.price * 100 * l.qty",
+      "why": "Converts to cents but drops the rounding step" },
+    { "id": "H6", "antigen": "A63", "file": "src/reports.js",
+      "find": "Math.round(l.amount * rate * 100)", "replace": "l.amount * rate * 100",
+      "why": "Same dropped-rounding variant in taxTotal()" }
+  ]
+}

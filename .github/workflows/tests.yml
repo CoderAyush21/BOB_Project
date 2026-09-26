@@ -1,0 +1,39 @@
+# Tests for Bug Vaccine itself, on every Python version the README promises (3.9+) and on
+# Windows, macOS and Linux. Node is needed for the JavaScript demo repo used by end-to-end tests.
+name: tests
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python: ["3.9", "3.10", "3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Configure git for the tests' throwaway repos
+        run: |
+          git config --global user.name "ci"
+          git config --global user.email "ci@example.invalid"
+          git config --global init.defaultBranch main
+      - name: Unit and end-to-end tests
+        run: python -m unittest discover -s tests -v
+      - name: Full demo
+        run: python bugvaccine.py demo --no-pause

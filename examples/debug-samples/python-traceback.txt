@@ -1,0 +1,6 @@
+Traceback (most recent call last):
+  File "app/config.py", line 14, in load_settings
+    return tomli.loads(raw)
+  File "tomli/_parser.py", line 623, in parse_hex_char
+    return pos, chr(hex_int)
+ValueError: chr() arg not in range(0x110000)

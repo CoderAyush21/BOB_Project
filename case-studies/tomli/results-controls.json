@@ -1,0 +1,58 @@
+{
+  "repo": "tomli",
+  "label": "",
+  "antigens": [
+    {
+      "id": "CTRL",
+      "title": "Control (not from history)",
+      "pattern": "checks that the runner can detect survivors"
+    },
+    {
+      "id": "T6",
+      "title": "Unbounded key depth",
+      "pattern": "no limit on the number of dotted key parts"
+    },
+    {
+      "id": "T4",
+      "title": "Invalid Unicode escape accepted",
+      "pattern": "escaped code points not validated as Unicode scalar values"
+    }
+  ],
+  "results": [
+    {
+      "id": "C1",
+      "antigen": "CTRL",
+      "file": "src/tomli/_parser.py",
+      "find": "raise TOMLDecodeError(\"Unclosed inline table\", src, pos)",
+      "replace": "raise TOMLDecodeError(\"Unclosed inline table!\", src, pos)",
+      "why": "Error message wording only; same exception type",
+      "status": "survived",
+      "seconds": 0.22
+    },
+    {
+      "id": "C2",
+      "antigen": "T6",
+      "file": "src/tomli/_parser.py",
+      "find": "MAX_KEY_PARTS: Final = sys.getrecursionlimit()",
+      "replace": "MAX_KEY_PARTS: Final = sys.getrecursionlimit() * 100",
+      "why": "Limit still exists but is 100x too loose",
+      "status": "killed",
+      "seconds": 0.24
+    },
+    {
+      "id": "C3",
+      "antigen": "T4",
+      "file": "src/tomli/_parser.py",
+      "find": "(0 <= codepoint <= 55295) or (57344 <= codepoint <= 1114111)",
+      "replace": "(0 <= codepoint <= 55295) or (57344 <= codepoint <= 1114112)",
+      "why": "Off-by-one at the top of the Unicode range: accepts \\U00110000, then chr() leaks ValueError",
+      "status": "survived",
+      "seconds": 0.22
+    }
+  ],
+  "killed": 1,
+  "total": 3,
+  "timeouts": 0,
+  "invalid": 0,
+  "immunity": 33
+}
