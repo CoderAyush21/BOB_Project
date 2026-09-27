@@ -85,10 +85,16 @@ The "Key finding" section in `bob-output/logs/prompt-5.md` appeared to quote spe
 
 **Limitation:** All 6 held-out mutants target the original fix sites (paginate.js, customers.js, money.js). None target `src/reports.js` — so immunity for the re-entry sites in reports.js under novel mutation strategies is not measured.
 
+### Changes after the Bob run (made with Claude, not Bob)
+
+While recording the demo video, a real bug turned up in the cure step: `bugvaccine.py patch --staged` also "fixed" Bug Vaccine's own knowledge file (`.bugvaccine/company-knowledge.json`) when it was staged in the same commit. That file stores the bugs as examples on purpose, so patching it would have quietly corrupted the company's knowledge. Pull-request review already skipped non-code files; `patch` did not.
+
+The fix (in `vaccine/patch.py`) makes `patch` touch only source-code files, never docs, JSON or anything under `.bugvaccine/`. A regression test (`tests/test_cure.py::PatchFiles::test_knowledge_files_and_docs_are_never_patched`) reproduces the original failure. This change was made with Claude after the 7-prompt Bob run; none of Bob's measured numbers above depend on it.
+
 ---
 
 ## Team members' Bob sessions
 
 | Member | What they used Bob for | Screenshots |
 |---|---|---|
-| Sahil (solo) | Full 7-prompt run: setup, antigen extraction, parallel hunt, antibody writing, blind held-out check, PR review + cure + prevent, verification + dashboard | `bob_sessions/Prompt 1 summary.png` → `bob_sessions/Prompt 7 summary.png` |
+| Sahil | Full 7-prompt run: setup, antigen extraction, parallel hunt, antibody writing, blind held-out check, PR review + cure + prevent, verification + dashboard | `bob_sessions/Prompt 1 summary.png` → `bob_sessions/Prompt 7 summary.png` |

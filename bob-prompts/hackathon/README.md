@@ -1,4 +1,4 @@
-# The IBM Bob hackathon run: 7 prompts
+# The IBM Bob hackathon run: 7 prompts (+1 follow-up)
 
 Paste them into IBM Bob **one at a time, in order** (Agent mode, with the `bug-vaccine` folder open). Each prompt ends by scanning for credentials, committing, and pushing to your `bob_project` GitHub repo.
 
@@ -11,6 +11,7 @@ Paste them into IBM Bob **one at a time, in order** (Agent mode, with the `bug-v
 | 5 | [Blind check](prompt-5-holdout.md) (**new session**) | Fresh subagent | Credibility of the numbers |
 | 6 | [Code review, cure and prevent](prompt-6-pr-cure.md) | Subagents + Agent mode | Business Value, full solution |
 | 7 | [Verify, write up and publish](prompt-7-writeup.md) | Orchestration and verification | Presentation |
+| 8 | [Verify the post-run fix and check the deliverables](prompt-8-verify-fix.md) (**new session, any team member**) | Code review + independent verification | Credibility, complete submission |
 
 **After each prompt:** screenshot Bob's task session summary (Win+Shift+S) and save it as `bob_sessions/prompt-N-summary.png`. The next prompt commits it. The hackathon requires these, from every team member.
 
