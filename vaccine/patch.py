@@ -6,7 +6,8 @@ Replacement templates use $1..$9 (JavaScript's syntax); the dashboard runs the s
 
 Safety rules:
   - a recipe is applied only on a line where that same bug's code signature matched;
-  - nothing is written unless apply=True, and only to files inside the repo;
+  - nothing is written unless apply=True, and only to source files inside the repo
+    (never Bug Vaccine's own knowledge files, whose examples contain the bugs on purpose);
   - after writing, the test command must still pass, otherwise every file is restored;
   - each patched file is re-scanned, and a patch only counts if the signature no longer matches.
 Lines that match a bug with no recipe are reported as "needs a human or Bob".
@@ -97,6 +98,10 @@ def patch_files(repo, files, kb, apply=False, test_cmd=None, timeout=120):
     report = {"files": [], "applied": False, "tests": None, "rolled_back": False, "verified": None}
     originals = {}
     for rel in files:
+        # only source code is patched: never docs, JSON or Bug Vaccine's own knowledge files,
+        # whose stored "before" examples look exactly like the bugs (mirrors debug.match_diff)
+        if not debug.is_code_file(rel):
+            continue
         path = run.safe_path(repo, rel)
         if not path.is_file():
             continue

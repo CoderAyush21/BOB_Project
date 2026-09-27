@@ -168,6 +168,19 @@ class PatchFiles(unittest.TestCase):
         self.assertFalse(r["applied"])
         self.assertEqual({f: f.read_bytes() for f in (self.repo / "src").glob("*.js")}, before)
 
+    def test_knowledge_files_and_docs_are_never_patched(self):
+        # `patch --staged` right after `guard install` sees the staged knowledge base, whose
+        # stored "before" examples are the bugs themselves: patching them would corrupt it
+        kb_file = self.repo / ".bugvaccine/company-knowledge.json"
+        kb_file.parent.mkdir(exist_ok=True)
+        kb_file.write_text(json.dumps(KB, indent=2), encoding="utf-8")
+        (self.repo / "docs/notes.md").write_text("return items.slice(start, start + size - 1);\n", encoding="utf-8")
+        before = {p: p.read_bytes() for p in (kb_file, self.repo / "docs/notes.md")}
+        r = patch.patch_files(self.repo, [".bugvaccine/company-knowledge.json", "docs/notes.md", "src/loyalty.js"],
+                              KB, apply=True, test_cmd="node --test")
+        self.assertEqual([f["file"] for f in r["files"]], ["src/loyalty.js"])
+        self.assertEqual({p: p.read_bytes() for p in before}, before)
+
     def test_files_outside_the_repo_are_refused(self):
         with self.assertRaises(ValueError):
             patch.patch_files(self.repo, ["../outside.js"], KB)
