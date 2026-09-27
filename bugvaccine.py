@@ -464,6 +464,19 @@ def cmd_learn(a):
     for s in kb["sources"]:
         print(f"  {s['name']:<24} {s['antigens']} bug patterns, {s['with_signatures']} with debugging signatures")
     print(f"Knowledge base: {len(kb['antigens'])} bug patterns -> {a.out}")
+    # every fix recipe must actually fix its own example: catch broken recipes here, not in a PR
+    import patch
+    bad = {x["key"]: patch.check_recipes(x) for x in kb["antigens"]}
+    bad = {k: v for k, v in bad.items() if v}
+    n_recipes = sum(bool(x.get("signatures", {}).get("patches")) for x in kb["antigens"])
+    if bad:
+        print("RECIPE CHECK FAILED (the knowledge base was still written):")
+        for k, problems in bad.items():
+            for p in problems:
+                print(f"  {k}: {p}")
+        sys.exit(2)
+    if n_recipes:
+        print(f"Recipe check: {n_recipes} bug pattern(s) with fix recipes, each one fixes its own example.")
 
 
 def cmd_debug(a):

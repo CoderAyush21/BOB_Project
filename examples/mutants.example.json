@@ -104,6 +104,11 @@
             "regex": "reduce\\(\\s*\\(\\s*(\\w+)\\s*,\\s*(\\w+)\\s*\\)\\s*=>\\s*(\\w+)\\s*\\+\\s*(\\w+)\\.(price|amount|total|cost|fee)\\b\\s*,\\s*0\\s*\\)",
             "replace": "reduce(($1, $2) => $3 + Math.round($4.$5 * 100), 0) / 100",
             "explain": "sum in integer cents and divide once (the #63 fix)"
+          },
+          {
+            "regex": "reduce\\(\\s*\\(\\s*(\\w+)\\s*,\\s*(\\w+)\\s*\\)\\s*=>\\s*(\\w+)\\s*\\+\\s*(\\w+)\\.(price|amount|cost|fee)\\s*\\*\\s*(\\w+)\\.(qty|quantity)\\s*,\\s*0\\s*\\)",
+            "replace": "reduce(($1, $2) => $3 + Math.round($4.$5 * 100) * $6.$7, 0) / 100",
+            "explain": "multiply in integer cents and divide once (the #63 fix)"
           }
         ]
       }

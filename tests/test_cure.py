@@ -42,6 +42,51 @@ class Template(unittest.TestCase):
         self.assertEqual(patch.apply_template(m, "[$1|$2|$3]"), "[a||]")
 
 
+class RecipeTemplates(unittest.TestCase):
+    """Agents often write Python-style group references; they must work like $1."""
+
+    def test_python_style_groups_are_accepted(self):
+        self.assertEqual(patch.normalize_template(r"\1.\g<2>?.$3"), "$1.$2?.$3")
+        kb = copy.deepcopy(KB)
+        for a in kb["antigens"]:
+            for p in a["signatures"].get("patches", []):
+                p["replace"] = p["replace"].replace("$", "\\")     # $1 -> \1
+        new, changes, _ = patch.patch_text(NEW_CODE, kb, "javascript")
+        self.assertEqual(new, patch.patch_text(NEW_CODE, KB, "javascript")[0])
+        self.assertEqual(len(changes), 3)
+
+    def test_every_reference_recipe_fixes_its_own_example(self):
+        for a in KB["antigens"]:
+            with self.subTest(antigen=a["key"]):
+                self.assertEqual(patch.check_recipes(a), [])
+
+    def test_a_recipe_that_leaves_group_references_is_reported(self):
+        a = copy.deepcopy(next(x for x in KB["antigens"] if x["id"] == "A41"))
+        a["signatures"]["patches"][0]["replace"] = ".slice($7)"          # a group that doesn't exist -> ''
+        self.assertEqual(patch.check_recipes(a), [])                      # expands to '' (JS behaviour), no leftovers
+        a["signatures"]["patches"][0]["replace"] = ".slice(%1)"           # typo'd reference survives literally
+        a["signatures"]["patches"][0]["regex"] = r"\.slice\(([^()]*?)\s*-\s*1\s*\)"
+        self.assertEqual(patch.check_recipes(a), [])
+        b = copy.deepcopy(a)
+        b["signatures"]["patches"][0]["regex"] = r"will-never-match"
+        self.assertTrue(any("doesn't change the example" in p for p in patch.check_recipes(b)))
+
+    def test_learn_fails_loudly_on_a_broken_recipe(self):
+        tmp = Path(tempfile.mkdtemp())
+        try:
+            spec = json.loads((ROOT / "examples/mutants.example.json").read_text(encoding="utf-8"))
+            spec["antigens"][0]["signatures"]["patches"][0]["regex"] = "will-never-match"
+            f = tmp / "a.json"
+            f.write_text(json.dumps(spec), encoding="utf-8")
+            r = subprocess.run([sys.executable, str(ROOT / "bugvaccine.py"), "learn", "--source", f"x={f}",
+                                "-o", str(tmp / "kb.json")], capture_output=True, text=True)
+            self.assertEqual(r.returncode, 2)
+            self.assertIn("RECIPE CHECK FAILED", r.stdout)
+            self.assertTrue((tmp / "kb.json").exists())
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+
 class PatchText(unittest.TestCase):
     def test_all_three_repeated_bugs_get_the_historical_fix(self):
         new, changes, unpatched = patch.patch_text(NEW_CODE, KB, "javascript")

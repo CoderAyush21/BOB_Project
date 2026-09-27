@@ -140,7 +140,9 @@
           const before = now;
           for (const p of s.patches || []) {
             const r = rx(p.regex, 'g'), ng = groupCount(p.regex);
-            if (r) now = now.replace(r, (...m) => p.replace.replace(/\$(\d)/g, (_, d) => (+d <= ng && m[+d] != null) ? m[+d] : ''));
+            // accept Python-style \1 and \g<1> too (mirrors patch.normalize_template)
+            const tpl = p.replace.replace(/\\g<(\d)>|\\(\d)/g, (_, a, b) => '$' + (a || b));
+            if (r) now = now.replace(r, (...m) => tpl.replace(/\$(\d)/g, (_, d) => (+d <= ng && m[+d] != null) ? m[+d] : ''));
           }
           if (now !== before) changes.push({line: n, before: before.trim(), after: now.trim(), key: a.key,
             title: a.title || a.key, explain: ((s.patches || [])[0] || {}).explain || ''});

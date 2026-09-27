@@ -19,12 +19,38 @@ import debug
 import run
 
 _TEMPLATE = re.compile(r"\$(\d)")
+_PY_GROUP = re.compile(r"\\g<(\d)>|\\(\d)")
+
+
+def normalize_template(template):
+    """Accept Python-style group references too: \\1 and \\g<1> become $1 (what the engines expand)."""
+    return _PY_GROUP.sub(lambda t: "$" + (t.group(1) or t.group(2)), template)
 
 
 def apply_template(m, template):
     """Expand $1..$9 like JavaScript's String.replace (a missing group becomes '')."""
     return _TEMPLATE.sub(lambda t: m.group(int(t.group(1))) or "" if int(t.group(1)) <= (m.re.groups or 0) else "",
-                         template)
+                         normalize_template(template))
+
+
+def check_recipes(antigen):
+    """Apply an antigen's recipes to its own example.before. Returns a list of problems (empty = fine)."""
+    s = antigen.get("signatures", {})
+    ex, patches = s.get("example") or {}, s.get("patches") or []
+    if not patches:
+        return []
+    if not ex.get("before"):
+        return ["has fix recipes but no example.before to check them against"]
+    kb = {"antigens": [{**antigen, "key": antigen.get("key", antigen.get("id"))}]}
+    problems = []
+    for line in ex["before"].splitlines():
+        new, changes, unpatched = patch_text(line, kb, s.get("lang"))
+        if unpatched:
+            problems.append(f"recipe doesn't change the example line: {line.strip()}")
+        for c in changes:
+            if _TEMPLATE.search(c["after"]) or _PY_GROUP.search(c["after"]):
+                problems.append(f"recipe output still contains a group reference: {c['after']}")
+    return problems
 
 
 def _applies(sig, lang):
