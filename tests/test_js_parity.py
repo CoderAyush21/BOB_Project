@@ -33,7 +33,7 @@ SAMPLES = {
     "new code": (ROOT / "examples/debug-samples/new-feature.js").read_text(encoding="utf-8"),
     "unknown": "The login button does nothing on Safari 17 after the last release.",
     # fake credentials, assembled at runtime so secret scanners don't flag this file
-    "secrets": 'DB_PASSWORD="Sup3rS3cretValue"\nurl = postgres://admin:hunter2pass@db:5432/x\nkey ' + "AKIA" + "ABCDEFGHIJKLMNOP",
+    "secrets": 'DB_PASSWORD="Sup3rS3cretValue"\nurl = postgres://admin:' + 'hunter2pass@db:5432/x\nkey ' + "AKIA" + "ABCDEFGHIJKLMNOP",
 }
 DIFF = (ROOT / "examples/debug-samples/pr-88.diff").read_text(encoding="utf-8")
 RISKY = [r"(a+)+$", r"(\w+)*x", r"\.slice\([^)]*[+-]\s*1\s*\)", r"(abc)+"]

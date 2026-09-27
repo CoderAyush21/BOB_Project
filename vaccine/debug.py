@@ -263,6 +263,9 @@ def main(argv=None):
         results["error"] = match(text, kb)
     # expand patterns ourselves: PowerShell and cmd don't expand *.js for native commands
     scan = [x for f in args.scan for x in (sorted(glob.glob(f)) or [f])]
+    missing = [f for f in scan if not Path(f).is_file()]
+    if missing:
+        sys.exit("No such file(s): " + ", ".join(missing) + ". Check the path or pattern.")
     for f in scan:
         results[f] = [m for m in match(Path(f).read_text(encoding="utf-8", errors="replace"), kb)
                       if any(r["kind"] == "code" for r in m["reasons"])]
