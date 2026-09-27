@@ -29,7 +29,7 @@ Bug Vaccine turns a repository's own history into a vaccine, using IBM Bob 2.0 t
 | Past bugs caught if re-introduced (known mutants) | 2 / 6 (33%) | 6 / 6 (100%) |
 | Held-out mutants caught (variants the antibodies weren't written against) | — | 6 / 6 (100%)* |
 | Postmortem #57 follow-ups completed | 0 / 2 | 2 / 2 (regression test added; nested-field audit done by the hunt) |
-| Antibody tests added | — | 6 (production code untouched) |
+| Antibody tests added | — | 23 (production code untouched) |
 | Time for one re-check (tool steps only: baseline + 6 mutants) | — | ~4.5 s with `node --test` (~11 s through `npm test`) |
 | Risks flagged in PR #88 before merge | — | 5: three new lines that repeat known bugs, two past-bug sites with no test |
 

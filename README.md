@@ -50,7 +50,7 @@ Bug Vaccine turns a repo's git history and incident postmortems into a vaccine:
 | Held-out mutants caught | **6/6 (100%)**, see the caveat in [problem & solution](docs/problem-and-solution.md) |
 | PR #88 (`refunds.js` + `loyalty.js`) | **5 risks flagged before merge**: 3 new lines repeating known bugs, 2 untested past-bug sites |
 | Cure | **3 of 3 repeated bugs patched** with the company's own fixes; tests pass; re-scan clean |
-| Prevent | pre-commit guard **blocks** a new copy of bug #41; 6 Semgrep rules exported |
+| Prevent | pre-commit guard **blocks** a new copy of bug #41; 3 Semgrep rules exported |
 | Production code changed | none; only tests added |
 | One re-check (baseline + 6 mutants) | ~4.5 s with `node --test` |
 

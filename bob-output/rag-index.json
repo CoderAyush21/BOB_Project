@@ -1,0 +1,95 @@
+{
+  "version": 1,
+  "generated": "2026-09-27 14:30",
+  "retriever": "bm25",
+  "chunks": [
+    {
+      "kind": "fix",
+      "repo": "demo-repo",
+      "ref": "demo-repo@ba7be5d",
+      "title": "fix: pagination dropped the last item of every page (#41)",
+      "text": "fix: pagination dropped the last item of every page (#41)\n\n-  return items.slice(start, start + size - 1);\n+  return items.slice(start, start + size);\n+import { test } from 'node:test';\n+import assert from 'node:assert/strict';\n+import { page } from '../src/paginate.js';\n+\n+test('regression #41: full pages keep their last item', () => {\n+  assert.deepEqual(page([1, 2, 3, 4, 5], 0, 2), [1, 2]);\n+  assert.deepEqual(page([1, 2, 3, 4, 5], 2, 2), [5]);\n+});",
+      "id": 1
+    },
+    {
+      "kind": "fix",
+      "repo": "demo-repo",
+      "ref": "demo-repo@e1b0ffe",
+      "title": "fix: crash when customer has no address (#57)",
+      "text": "fix: crash when customer has no address (#57)\n\n+# Postmortem: nightly invoice run crashed (#57)\n+\n+**Date:** 2026-04-14 · **Severity:** SEV-2 · **Duration:** 3h 10m\n+\n+## What happened\n+The nightly invoice run crashed with `TypeError: Cannot read properties of undefined (reading 'city')`.\n+312 invoices were not sent until the run was restarted by hand.\n+\n+## Root cause\n+Customers imported from the new CRM can be created **without an address object**.\n+`billingCity()` read `customer.address.city` directly.\n+\n+## Fix\n+Guard with optional chaining and fall back to `'Unknown'`.\n+\n+## Follow-ups\n+- [ ] Add a regression test for customers with no address  ← *never done*\n+- [ ] Audit other code that reads nested customer fields\n-  return customer.address.city;\n+  return customer.address?.city ?? 'Unknown';",
+      "id": 2
+    },
+    {
+      "kind": "fix",
+      "repo": "demo-repo",
+      "ref": "demo-repo@d40bd6f",
+      "title": "fix: invoice totals off by a cent due to float math (#63)",
+      "text": "fix: invoice totals off by a cent due to float math (#63)\n\n+// Work in integer cents: float math drifts (0.1 + 0.2 !== 0.3).\n-  return lines.reduce((sum, l) => sum + l.price * l.qty, 0);\n+  const cents = lines.reduce((sum, l) => sum + Math.round(l.price * 100) * l.qty, 0);\n+  return cents / 100;\n+import { test } from 'node:test';\n+import assert from 'node:assert/strict';\n+import { invoiceTotal } from '../src/money.js';\n+\n+test('sums lines', () => {\n+  assert.equal(invoiceTotal([{ price: 10, qty: 2 }, { price: 5, qty: 1 }]), 25);\n+});\n+\n+test('regression #63: no float drift', () => {\n+  assert.equal(invoiceTotal([{ price: 0.1, qty: 1 }, { price: 0.2, qty: 1 }]), 0.3);\n+});",
+      "id": 3
+    },
+    {
+      "kind": "postmortem",
+      "repo": "demo-repo",
+      "ref": "docs/postmortems/2026-04-invoice-run-crash.md",
+      "title": "Postmortem: nightly invoice run crashed (#57)",
+      "text": "**Date:** 2026-04-14 · **Severity:** SEV-2 · **Duration:** 3h 10m",
+      "id": 4
+    },
+    {
+      "kind": "postmortem",
+      "repo": "demo-repo",
+      "ref": "docs/postmortems/2026-04-invoice-run-crash.md",
+      "title": "Postmortem: nightly invoice run crashed (#57) > What happened",
+      "text": "The nightly invoice run crashed with `TypeError: Cannot read properties of undefined (reading 'city')`.\n312 invoices were not sent until the run was restarted by hand.",
+      "id": 5
+    },
+    {
+      "kind": "postmortem",
+      "repo": "demo-repo",
+      "ref": "docs/postmortems/2026-04-invoice-run-crash.md",
+      "title": "Postmortem: nightly invoice run crashed (#57) > Root cause",
+      "text": "Customers imported from the new CRM can be created **without an address object**.\n`billingCity()` read `customer.address.city` directly.",
+      "id": 6
+    },
+    {
+      "kind": "postmortem",
+      "repo": "demo-repo",
+      "ref": "docs/postmortems/2026-04-invoice-run-crash.md",
+      "title": "Postmortem: nightly invoice run crashed (#57) > Fix",
+      "text": "Guard with optional chaining and fall back to `'Unknown'`.",
+      "id": 7
+    },
+    {
+      "kind": "postmortem",
+      "repo": "demo-repo",
+      "ref": "docs/postmortems/2026-04-invoice-run-crash.md",
+      "title": "Postmortem: nightly invoice run crashed (#57) > Follow-ups",
+      "text": "- [ ] Add a regression test for customers with no address  ← *never done*\n- [ ] Audit other code that reads nested customer fields",
+      "id": 8
+    },
+    {
+      "kind": "pattern",
+      "repo": "invoice-kit",
+      "ref": "invoice-kit:A41",
+      "title": "#41 Off-by-one in slice end",
+      "text": "#41 Off-by-one in slice end\nUsing slice(start, start + n - 1) instead of slice(start, start + n), dropping the last item of every page because slice's end index is already exclusive\nThe end index of slice() is exclusive, so use slice(start, start + size) with no - 1.\ntest('regression #41: full pages keep their last item', () => { assert.deepEqual(page([1,2,3,4,5], 0, 2), [1,2]); assert.deepEqual(page([1,2,3,4,5], 2, 2), [5]); });\nslice() call whose end argument is reduced by 1 — the end index is already exclusive, so this drops the last element\nafae168623",
+      "id": 9
+    },
+    {
+      "kind": "pattern",
+      "repo": "invoice-kit",
+      "ref": "invoice-kit:A57",
+      "title": "#57 Missing null guard on nested customer field",
+      "text": "#57 Missing null guard on nested customer field\nReading a nested object property (e.g. customer.address.city) without an optional-chaining guard, crashing when the intermediate object is undefined or null\nGuard the nested object with ?. (the #57 fix); add a sensible default if the caller needs one.\ntest('regression #57: billingCity survives no address', () => { assert.equal(billingCity({}), 'Unknown'); assert.equal(billingCity({address: {city: 'NYC'}}), 'NYC'); });\ntwo-level property access on customer object without optional chaining — crashes if the intermediate object is undefined\nc715c20cc7\nAdd a regression test for customers with no address\nAudit other code that reads nested customer fields",
+      "id": 10
+    },
+    {
+      "kind": "pattern",
+      "repo": "invoice-kit",
+      "ref": "invoice-kit:A63",
+      "title": "#63 Float money math",
+      "text": "#63 Float money math\nSumming currency values as IEEE 754 floating-point numbers, causing rounding drift (e.g. 0.1 + 0.2 !== 0.3); fix is to work in integer cents\nSum in integer cents and divide once (the #63 fix).\ntest('regression #63: no float drift', () => { assert.equal(invoiceTotal([{price: 0.1, qty: 1}, {price: 0.2, qty: 1}]), 0.3); });\nreduce() accumulating a money field via direct property access (lowercase var.field, not Math.round) — float sum without integer-cent conversion\na25152d796",
+      "id": 11
+    }
+  ]
+}
