@@ -84,6 +84,7 @@ def build(args):
                                                 "before": runs["before"], "after": runs["after"]}],
         "samples": {"diff": sample(args.diff_sample)},
         "rag": (load(args.rag) or {}).get("chunks", []),
+        "cure": load(args.cure),
     }
 
 
@@ -124,6 +125,7 @@ def render(data, web_fonts=False):
         "redact": [[n, p, f, how] for n, p, f, how in redact.RULES],
         "nestedQuantifier": debug._NESTED_QUANTIFIER.pattern,
         "maxText": debug.MAX_TEXT, "maxLine": debug.MAX_LINE,
+        "extLang": debug.EXT_LANG, "codeExt": sorted(debug.CODE_EXT),
         "rag": {"stop": sorted(rag.STOP), "k1": rag.K1, "b": rag.B, "boost": rag.SIGNATURE_BOOST},
     }
     payload = (json.dumps(data, ensure_ascii=False)
@@ -155,6 +157,7 @@ def main(argv=None):
                     help="add a project to the Company view (repeatable)")
     ap.add_argument("--diff-sample", help="a unified diff to offer as a Debug lab example")
     ap.add_argument("--rag", help="RAG index (bugvaccine.py index) for cited company sources in the Debug lab")
+    ap.add_argument("--cure", help="cure & prevent results (patch report, PR re-check, guard, rules) for step 9")
     ap.add_argument("--web-fonts", action="store_true",
                     help="load IBM Plex from Google Fonts (off by default: the page makes no network requests)")
     ap.add_argument("--title", default="Bug Vaccine")
@@ -567,9 +570,21 @@ function cleanRun(r){
 D.projects = (D.projects || []).map(p => ({name: String(p.name), before: cleanRun(p.before), after: cleanRun(p.after)}));
 D.history.total = num(D.history.total); D.history.fixes = num(D.history.fixes);
 D.antibodies = (D.antibodies || []).map(String);
+if (D.cure && typeof D.cure === 'object') {
+  const c = D.cure;
+  c.patch = c.patch || {files: []};
+  c.patch.files = (c.patch.files || []).map(f => ({file: String(f.file), changes: (f.changes || []).map(x => ({line: num(x.line),
+    before: String(x.before), after: String(x.after), title: String(x.title), explain: String(x.explain || '')})),
+    unpatched: (f.unpatched || []).map(u => ({line: num(u.line), text: String(u.text), title: String(u.title)}))}));
+  c.patch.tests = String(c.patch.tests || 'not run'); c.patch.verified = !!c.patch.verified;
+  c.pr_after = c.pr_after || {}; ['new_code', 'untested', 'total'].forEach(k => c.pr_after[k] = num(c.pr_after[k]));
+  c.guard = {blocked: !!(c.guard || {}).blocked, file: String((c.guard || {}).file || ''), line: String((c.guard || {}).line || ''),
+             output: String((c.guard || {}).output || '')};
+  c.rules = {count: num((c.rules || {}).count), file: String((c.rules || {}).file || '')};
+} else D.cure = null;
 D.rag = (D.rag || []).map((c, i) => ({id: num(c.id) || i + 1, kind: String(c.kind), repo: String(c.repo), ref: String(c.ref), title: String(c.title), text: String(c.text)}));
 
-const {redactText, riskyRegex, rx, detectLang, matchText, ragSearch, isDiff, parseDiff, matchDiff, MAX_TEXT, MAX_LINE} =
+const {redactText, riskyRegex, rx, detectLang, matchText, ragSearch, isDiff, parseDiff, matchDiff, patchText, MAX_TEXT, MAX_LINE} =
   BugVaccineEngine.create({getKb: () => kb(), rag: D.rag, config: CFG});   // vaccine/web/engine.js
 try { localStorage.removeItem('bv-input'); } catch (e) {}   // older versions saved pasted text; never keep it
 const $ = s => document.querySelector(s);
@@ -594,6 +609,8 @@ const STEPS = [
    what:'New variations of the same bugs, written without seeing the tests. This shows whether the tests guard the pattern or only memorised the first mutants.'},
   {key:'pr', title:'Review a pull request', who:'tool + Bob', has:() => !!R.pr,
    what:'On a pull request, check only the changed files and warn the reviewer if new code repeats a bug the project has already shipped.'},
+  {key:'cure', title:'Cure & prevent', who:'tool', has:() => !!D.cure,
+   what:"Patch the repeated bugs with the fixes the team already wrote (tests must still pass), then stop them coming back: a pre-commit guard and lint rules for every IDE and CI."},
 ];
 
 const n = (r, k) => r ? r[k] : '?';
@@ -607,7 +624,10 @@ const SAY = {
   holdout: () => `Were the tests just memorising? A fresh subagent that never saw them invents new variants of the same bugs. ${n(R.holdout,'killed')} of ${n(R.holdout,'total')} are caught.`,
   pr: () => { const k = R.pr ? prProblems(R.pr) : 0;
     return `Where it matters most: a pull request. Only the changed files are checked, and this one repeats ${k} bug${k === 1 ? '' : 's'} the project has already shipped. The reviewer sees it before merge.`; },
+  cure: () => { const c = D.cure, f = cureFixes(c);
+    return `Finding bugs isn't enough. Bug Vaccine patches ${f.length} of them with the fixes the team already wrote, the tests still pass, and a pre-commit guard ${c.guard.blocked ? 'blocks' : 'would block'} the next copy before it's even committed.`; },
 };
+const cureFixes = c => (c && c.patch ? c.patch.files : []).flatMap(f => (f.changes || []).map(x => ({...x, file: f.file})));
 const prProblems = p => p.results.filter(x => x.status === 'survived').length + (p.new_code ? p.new_code.length : 0);
 let cur = 0, playing = false, timer = null, plateRun = null, selected = null, captions = false;
 const recurCount = a => ((a.source_commit || '').match(/\b[0-9a-f]{7,40}\b/g) || []).length;
@@ -715,6 +735,32 @@ const PANELS = {
       toggle:[['before','Before'],['after','After']], active}) + table(R.after, 'after', R.before);
   },
   holdout(){ return plate(R.holdout, {title:'blind check', runKey:'holdout'}) + table(R.holdout, 'holdout'); },
+  cure(){
+    const c = D.cure, fixes = cureFixes(c), manual = c.patch.files.flatMap(f => f.unpatched.map(u => ({...u, file: f.file})));
+    const before = R.pr ? (R.pr.new_code || []).length : null;
+    return `<div class="grid" style="margin-bottom:16px">
+      <div class="card"><span class="id">cure</span><h3>${fixes.length} bug${fixes.length === 1 ? '' : 's'} patched</h3>
+        <div class="pattern">with the fixes the team already wrote</div>
+        <div class="row"><span class="pill ${c.patch.tests === 'pass' ? 'ok' : 'no'}">tests ${esc(c.patch.tests)}</span>
+          <span class="pill ${c.patch.verified ? 'ok' : 'no'}">${c.patch.verified ? 're-scan clean' : 're-scan not clean'}</span></div></div>
+      <div class="card"><span class="id">re-check</span><h3>${before != null ? before + ' → ' : ''}${c.pr_after.new_code} repeated bugs</h3>
+        <div class="pattern">in the lines PR #88 adds</div>
+        ${c.pr_after.untested ? `<div class="src">${c.pr_after.untested} past-bug site${c.pr_after.untested > 1 ? 's' : ''} still need a test (Bob's antibody step)</div>` : ''}</div>
+      <div class="card"><span class="id">prevent</span><h3>${c.guard.blocked ? 'Commit blocked' : 'Guard did not block'}</h3>
+        <div class="pattern">pre-commit guard stopped a new copy of bug #41</div>
+        <div class="src">+ ${c.rules.count} Semgrep rules for IDEs and CI</div></div>
+    </div>
+    <div class="sect"><b>The patch (the company's own past fixes)</b></div>
+    ${fixes.map(x => `<div class="risk" style="margin-top:8px"><div><code>${esc(x.file)}:${x.line}</code> <b>${esc(x.title)}</b></div>
+      <div class="diff"><div class="d">- ${esc(x.before)}</div><div class="a">+ ${esc(x.after)}</div></div>
+      <div class="hint">${esc(x.explain)}</div></div>`).join('')}
+    ${manual.length ? `<div class="sect" style="margin-top:12px"><b>No fix recipe: needs a human or Bob</b></div>${manual.map(u =>
+      `<div class="risk"><code>${esc(u.file)}:${u.line}</code> ${esc(u.title)}<div class="diff"><div>${esc(u.text)}</div></div></div>`).join('')}` : ''}
+    <div class="sect" style="margin-top:16px"><b>The guard, on the next commit</b></div>
+    <div class="diff"><div class="a">+ ${esc(c.guard.line)}</div></div>
+    <pre class="prompt" style="margin-top:8px">$ git commit -m "feat: paging helper"
+${esc(c.guard.output)}</pre>`;
+  },
   pr(){
     // Same two checks, and the same rule, as run.render_markdown: never a green result for unchecked code
     const p = R.pr, risky = p.results.filter(x => x.status === 'survived'), nc = p.new_code;
@@ -953,7 +999,9 @@ function runDiff(text){
   const cards = groups.map(({a, items}) => { const s = a.signatures || {};
     return `<div class="match known"><div class="row"><span class="pill no">known bug</span><span class="chip">${esc(a.repo)}</span>${recurBadge(a)}</div>
       <h3>${esc(a.title)}</h3>
-      <div class="reasons">${items.map(f => `<div><span class="k">${esc(f.file.split('/').pop())}:${f.line}</span><span><code>${esc(f.text)}</code><br><span class="hint">${esc(f.explain)}</span></span></div>`).join('')}</div>
+      <div class="reasons">${items.map(f => { const fx = patchText(f.text).changes[0];
+        return `<div><span class="k">${esc(f.file.split('/').pop())}:${f.line}</span><span><code>${esc(f.text)}</code><br><span class="hint">${esc(f.explain)}</span>
+        ${fx ? `<div class="diff" style="margin-top:6px"><div class="d">- ${esc(fx.before)}</div><div class="a">+ ${esc(fx.after)}</div></div><span class="hint">Suggested fix: the company's own past fix</span>` : ''}</span></div>`; }).join('')}</div>
       ${s.fix_hint ? `<div class="sect"><b>How it was fixed before</b>${esc(s.fix_hint)}</div>` : ''}${exampleDiff(s.example)}
       ${s.antibody ? `<div class="sect"><b>Test to add</b>${esc(s.antibody)}</div>` : ''}</div>`; }).join('');
   const pseudo = groups.map(g => ({a: g.a, confidence: 'known bug', score: 3 * g.items.length}));
@@ -961,6 +1009,19 @@ function runDiff(text){
   const sources = ragSearch(query, 4, pseudo);
   $('#dbg-out').innerHTML = `${head}${cards}${sourcesHtml(sources)}${promptHtml(text, pseudo, sources, "Paste this into IBM Bob, opened on the pull request's branch.")}`;
   bindPrompt(text, pseudo, sources);
+}
+function autoFixHtml(fix){
+  if (!fix.changes.length) return '';
+  return `<div class="match known" style="border-left-color:var(--caught)">
+    <div class="row"><span class="pill ok">auto-fix available</span></div>
+    <h3>${fix.changes.length} line${fix.changes.length > 1 ? 's' : ''} can be fixed with the company's own past fixes</h3>
+    ${fix.changes.map(c => `<div class="sect"><b>line ${c.line} · ${esc(c.title)}</b></div>
+      <div class="diff"><div class="d">- ${esc(c.before)}</div><div class="a">+ ${esc(c.after)}</div></div>
+      <span class="hint">${esc(c.explain)}</span>`).join('')}
+    ${fix.unpatched.length ? `<p class="hint">${fix.unpatched.length} matching line(s) have no fix recipe; hand those to Bob below.</p>` : ''}
+    <div class="row"><button class="btn primary" type="button" id="copy-fixed">Copy fixed code</button>
+      <span class="hint">In a repo: <code>bugvaccine.py patch . --staged --apply</code> writes it, runs your tests and re-checks.</span></div>
+  </div>`;
 }
 function promptHtml(text, matches, sources, intro){
   const hidden = redactText(text)[1];
@@ -1022,9 +1083,11 @@ function runDebug(){
       ${m.a.source_commit || m.a.postmortem ? `<div class="sect"><b>History</b>${m.a.source_commit ? 'Fixed in ' + esc(m.a.source_commit) : ''}${m.a.postmortem ? ` · incident <code>${esc(m.a.postmortem)}</code>` : ''}</div>` : ''}
     </div>`; }).join('');
   const sources = ragSearch(text, 4, matches);
-  out.innerHTML = `${head}${cards}${sourcesHtml(sources)}${promptHtml(text, matches, sources,
+  const fix = patchText(text);
+  out.innerHTML = `${head}${autoFixHtml(fix)}${cards}${sourcesHtml(sources)}${promptHtml(text, matches, sources,
     'Paste this into IBM Bob, opened in the affected repo. It includes what your company already knows, with sources to cite.')}`;
   bindPrompt(text, matches, sources);
+  if ($('#copy-fixed')) $('#copy-fixed').onclick = () => copy(fix.text, 'Fixed code copied');
   testTeach();
 }
 let debTimer;

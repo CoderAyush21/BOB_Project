@@ -48,12 +48,28 @@ Bug Vaccine turns a repo's git history and incident postmortems into a vaccine:
 | Past bugs caught if re-introduced | **2/6 (33%) → 6/6 (100%)** |
 | Held-out mutants caught | **6/6 (100%)**, see the caveat in [problem & solution](docs/problem-and-solution.md) |
 | PR #88 (`refunds.js` + `loyalty.js`) | **5 risks flagged before merge**: 3 new lines repeating known bugs, 2 untested past-bug sites |
+| Cure | **3 of 3 repeated bugs patched** with the company's own fixes; tests pass; re-scan clean |
+| Prevent | pre-commit guard **blocks** a new copy of bug #41; 6 Semgrep rules exported |
 | Production code changed | none; only tests added |
 | One re-check (baseline + 6 mutants) | ~4.5 s with `node --test` |
 
 Findings a reviewer would likely miss:
 - **#57 was fixed without a test.** Its postmortem said to add one, and it never happened.
 - The newer `reports.js` repeats **all three** historical bug patterns, and its tests catch none of them.
+
+## Cure and prevent
+
+Finding a repeated bug is only half the job. Bug Vaccine also **fixes it with the fix your team already wrote**, and **stops it coming back**:
+
+| | Command | What it does |
+|---|---|---|
+| **Cure** | `bugvaccine.py patch <repo> --base main --apply` | Applies each bug pattern's *fix recipe* (learned from the original fix commit), only on lines where that bug's signature matches. Re-runs your tests and **rolls everything back if they fail**, then re-scans to prove the bug is gone. Without `--apply` it's a dry run that shows the diff. Lines with no recipe are handed to Bob. |
+| **Prevent: commits** | `bugvaccine.py guard install <repo>` | A pre-commit hook that **blocks commits** whose new lines repeat a known company bug, and shows the historical fix. `patch . --staged --apply` fixes them in one step. |
+| **Prevent: PRs** | `bugvaccine.py pr ...` | The PR comment shows a **suggested fix** for each repeated bug; `--fail-on-new-risks` makes CI block the merge. |
+| **Prevent: everywhere** | `bugvaccine.py rules <repo>` | Exports the knowledge as **Semgrep rules**, so IDEs and other CI tools flag the patterns too. |
+| **Prevent: tests** | Bob, Phase 3 | Antibody tests guard each pattern in the test suite itself. |
+
+In the demo, PR #88 repeats three known bugs: all three are patched with the company's own fixes, the tests pass, the re-scan is clean, and the guard then blocks a fresh copy of bug #41 at commit time.
 
 ## Real-world case study: tomli
 

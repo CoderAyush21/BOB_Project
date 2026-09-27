@@ -15,6 +15,7 @@ How Bug Vaccine meets each part of the IBM Bob 2.0 Hackathon brief. Tick these o
 | "Document understanding" | Step 2: Bob reads git diffs **and postmortem docs**, and flags unfinished follow-ups (e.g. "add a regression test ← never done"). | ⚠️ show in video |
 | "Manage and improve multiple steps, not just assist with coding" | Bob drives a 6-step workflow end to end. It isn't only writing code. | ✅ |
 | "Clearly demonstrate impact" | Measured, not estimated: immunity 33% → 100% on known mutants, a held-out check against overfitting, and 5 risks flagged in PR #88 before merge (3 new lines repeating known bugs, 2 untested past-bug sites). | ✅ |
+| Full solution, not just detection | Cure: `patch` applies the company's own past fixes (tests must pass, rolled back otherwise). Prevent: pre-commit guard, PR gate, Semgrep rules, antibody tests. | ✅ |
 | "Code review" workflow | PR mode: `bugvaccine.py pr` checks new lines against company bug history *and* re-runs stored mutants in changed files, in one PR comment. | ✅ |
 
 ## Judging criteria

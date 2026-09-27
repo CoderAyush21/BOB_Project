@@ -22,3 +22,5 @@ Then: **Teach the debugger.** Add a `signatures` block to each antigen, so later
    - `code` regexes describe the risky line; `errors` regexes describe the error message or bug report (from the fix commit, issue or postmortem).
    - Regexes must work in **both Python and JavaScript**: no `(?P<name>)`, no inline flags like `(?i)`, and no nested quantifiers such as `(a+)+`.
    - `code` regexes must **not** match today's fixed code. Check: `python bugvaccine.py learn --source invoice-kit=antigens.json -o knowledge.json`, then `python bugvaccine.py debug --kb knowledge.json --scan demo-repo/src/*.js` must report no code matches.
+   - Also add `"patches": [{"regex": "...", "replace": "... $1 ...", "explain": "..."}]`: a **fix recipe** that turns the buggy line into the fixed one, taken from the original fix commit. `replace` uses `$1`..`$9` for groups. Check it: `python bugvaccine.py patch demo-repo src/<file> --kb knowledge.json` must show the historical fix, and must change nothing in today's fixed code.
+

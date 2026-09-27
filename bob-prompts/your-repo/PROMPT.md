@@ -38,6 +38,7 @@ All Bug Vaccine files live in `.bugvaccine/`.
    - Regexes must work in **both Python and JavaScript**: no `(?P<name>)`, no inline flags like `(?i)`.
    - `code` regexes run line by line and must **not** match the current, fixed code. Check with `{{BV}} debug --kb <kb> --scan <fixed file>` once the knowledge base is built.
    - `errors` regexes run on the whole text, case-insensitively. Base them on the real error text from the fix commit, issue or postmortem.
+   - Add `"patches": [{"regex", "replace", "explain"}]`, a **fix recipe** from the original fix (`$1`..`$9` for groups), so `{{BV}} patch` can apply the fix automatically next time. It must turn the buggy line into the fixed one and change nothing in today's fixed code.
 
 ## Phase 2: Hunt (parallel subagents)
 1. One subagent per antigen, in parallel. Each finds every place in the **current** code where its pattern could recur: the original fix site (it may have moved or been refactored) **and** similar code elsewhere.
@@ -52,6 +53,11 @@ All Bug Vaccine files live in `.bugvaccine/`.
 
 ## Phase 4: Held-out check (new session or fresh subagent)
 Without looking at `mutants.json` or the antibody tests, design 2 new mutants per antigen that differ from simply reverting the fix. Save them as `.bugvaccine/mutants.holdout.json`, then run `{{BV}} check . --mutants .bugvaccine/mutants.holdout.json` and `{{BV}} run . --mutants .bugvaccine/mutants.holdout.json -o results-holdout.json`. Report the score as it is, and don't tune the antibodies afterwards.
+
+## Phase 5: Cure and prevent
+1. `{{BV}} patch . --base main --apply`: applies the company's own past fixes to any new code that repeats a known bug, re-runs the tests (rolled back on failure) and re-scans. Fix any line reported as *needs a human or Bob* yourself, then add a recipe for it.
+2. Guard future commits: commit the knowledge base as `.bugvaccine/company-knowledge.json`, then `{{BV}} guard install .` (each developer runs this once).
+3. Lint everywhere: `{{BV}} rules . -o .semgrep/bug-vaccine.yml`, and add it to the team's Semgrep/CI config.
 
 ## Report
 A table of antigens → mutants → caught/survived/equivalent; immunity before → after; held-out immunity; the antibody tests added; and any real test gaps found. Recommend a `min_immunity` value for `.bugvaccine/config.json` if the team wants a CI gate.

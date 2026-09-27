@@ -33,13 +33,17 @@
 **Screen:** the PR comment from `pr-comment.md`.
 **Say:** "Run it on every pull request. This PR adds a loyalty feature that repeats three bugs we've already fixed, and a refunds module whose past-bug risks have no test. Bug Vaccine flags all five before merge."
 
+## 2:52–3:05 · Cure and prevent (worth the extra seconds)
+**Screen:** dashboard step 9, "Cure & prevent".
+**Say:** "And it doesn't just warn. It patches all three with the fixes our team already wrote, the tests still pass, and the pre-commit guard blocks the next copy before it's even committed."
+
 ## Optional, if you have 20 more seconds · It's also a debugger
 **Screen:** dashboard → **Debug lab** → "JavaScript crash" example, then "Pull request diff".
 **Say:** "Everything Bug Vaccine learns becomes company knowledge. Paste a crash, and it tells you we've had this bug before, which incident it was, and how we fixed it. Paste a pull request diff, and it flags the new lines that repeat old mistakes."
 
 **Tip for recording:** turn on **Captions** and press **Play walkthrough**. The captions carry the narration for each step, with the real numbers from the run.
 
-## 2:52–3:00 · Close
+## 3:05–3:12 · Close
 **Say:** "Every number here comes from actually running the tests, not an AI estimate. Bob proposes; the test runner decides. Bug Vaccine: your codebase never catches the same bug twice."
 
 ## Recording tips

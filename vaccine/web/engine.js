@@ -89,8 +89,12 @@
     }
 
     /* diff review (mirrors debug.parse_diff / match_diff) */
-    const EXT_LANG = {'.py':'python', '.js':'javascript', '.mjs':'javascript', '.cjs':'javascript', '.jsx':'javascript',
+    const EXT_LANG = CFG.extLang || {'.py':'python', '.js':'javascript', '.mjs':'javascript', '.cjs':'javascript', '.jsx':'javascript',
       '.ts':'javascript', '.tsx':'javascript', '.java':'java', '.go':'go'};
+    // only source code is reviewed; docs, JSON and Bug Vaccine's own knowledge files are skipped (mirrors debug.is_code_file)
+    const CODE_EXT = new Set(CFG.codeExt || Object.keys(EXT_LANG));
+    const extOf = p => ((p.match(/\.[^./]+$/) || [''])[0]).toLowerCase();
+    const isCodeFile = p => CODE_EXT.has(extOf(p)) && !p.split('/').includes('.bugvaccine');
     const isDiff = t => /^(diff --git |@@ -\d+(,\d+)? \+\d+(,\d+)? @@)/m.test(t);
     function parseDiff(t){
       const files = {}; let file = null, ln = 0;
@@ -106,7 +110,8 @@
     function matchDiff(t){
       const out = [], files = parseDiff(t);
       for (const [path, added] of Object.entries(files)) {
-        const lang = EXT_LANG[((path.match(/\.[^./]+$/) || [''])[0]).toLowerCase()];
+        if (!isCodeFile(path)) continue;
+        const lang = EXT_LANG[extOf(path)];
         for (const a of getKb()) { const s = a.signatures || {};
           if (lang && s.lang && s.lang !== lang) continue;
           for (const c of s.code || []) { const r = rx(c.regex, ''); if (!r) continue;
@@ -115,8 +120,39 @@
       return {files, findings: out.sort((x, y) => (x.file < y.file ? -1 : x.file > y.file ? 1 : 0) || x.line - y.line)};
     }
 
+    /* cure (mirrors vaccine/patch.py patch_text): a recipe only runs on a line where that same
+       bug's code signature matched; $1..$9 expand to groups, and a missing group becomes '' */
+    const groupCount = src => { try { return new RegExp(src + '|').exec('').length - 1; } catch (e) { return 0; } };
+    function patchText(text, lang){
+      lang = lang || detectLang(text);
+      const head = text.slice(0, MAX_TEXT), rest = text.slice(MAX_TEXT);
+      const parts = head.split(/(\r\n|\n|\r)/);
+      const out = [], changes = [], unpatched = [];
+      for (let i = 0, n = 1; i < parts.length; i += 2, n++) {
+        const body = parts[i], ending = parts[i + 1] || '';
+        if (body === '' && ending === '') continue;
+        const line = body.slice(0, MAX_LINE);
+        let now = line;
+        for (const a of getKb()) {
+          const s = a.signatures || {};
+          if (lang && s.lang && s.lang !== lang) continue;
+          if (!(s.code || []).some(c => { const r = rx(c.regex, ''); return r && r.test(now); })) continue;
+          const before = now;
+          for (const p of s.patches || []) {
+            const r = rx(p.regex, 'g'), ng = groupCount(p.regex);
+            if (r) now = now.replace(r, (...m) => p.replace.replace(/\$(\d)/g, (_, d) => (+d <= ng && m[+d] != null) ? m[+d] : ''));
+          }
+          if (now !== before) changes.push({line: n, before: before.trim(), after: now.trim(), key: a.key,
+            title: a.title || a.key, explain: ((s.patches || [])[0] || {}).explain || ''});
+          else unpatched.push({line: n, text: before.trim(), key: a.key, title: a.title || a.key, fix_hint: s.fix_hint || ''});
+        }
+        out.push(now + body.slice(line.length) + ending);
+      }
+      return {text: out.join('') + rest, changes, unpatched};
+    }
+
     return { redactText, riskyRegex, rx, detectLang, matchText, rtokens, ragSearch, isDiff, parseDiff, matchDiff,
-             MAX_TEXT, MAX_LINE };
+             patchText, MAX_TEXT, MAX_LINE };
   }
   const api = { create };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

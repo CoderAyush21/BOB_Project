@@ -281,10 +281,16 @@ def render_markdown(r, new_code=None):
             a = f["antigen"]
             lines.append(f"- `{md(f['file'], code=True)}:{f['line']}` **{md(a.get('title', f['key']))}** "
                          f"({md(a.get('repo', ''))}): {md(f['explain'])}")
-            lines.append(f"  ```\n  {fence(f['text'])}\n  ```")
-            hint = a.get("signatures", {}).get("fix_hint")
-            if hint:
-                lines.append(f"  How it was fixed before: {md(hint)}")
+            if f.get("fix"):
+                lines.append(f"  Suggested fix (the company's own past fix):\n  ```diff\n  - {fence(f['text'])}\n  + {fence(f['fix'])}\n  ```")
+            else:
+                lines.append(f"  ```\n  {fence(f['text'])}\n  ```")
+                hint = a.get("signatures", {}).get("fix_hint")
+                if hint:
+                    lines.append(f"  How it was fixed before: {md(hint)}")
+        if any(f.get("fix") for f in new_code):
+            lines.append("\nApply every suggested fix, re-run the tests and re-check, in one step:\n"
+                         "```\npython bugvaccine.py patch . --base <base-branch> --apply\n```")
         lines.append("")
     else:
         lines.append("No added line matches a known company bug.\n")

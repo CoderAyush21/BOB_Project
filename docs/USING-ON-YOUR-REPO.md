@@ -72,6 +72,35 @@ The comment only shows ✅ when something was actually checked and nothing was f
 
 **Limitation:** signatures recognise known *shapes* of past bugs. A new variation that looks different is found by the **Bob hunt on the PR** (`bob-prompts/05-pr-mode.md`).
 
+## Cure and prevent
+
+**Cure: apply the fix your team already wrote.** Each bug pattern can carry a fix recipe (`"patches"` in its signatures, written by Bob from the original fix commit).
+
+```bash
+python bugvaccine.py patch <repo> --base main            # dry run: shows the diff, changes nothing
+python bugvaccine.py patch <repo> --base main --apply    # writes it, runs your tests, re-scans
+python bugvaccine.py patch <repo> src/new_module.js --apply
+python bugvaccine.py patch . --staged --apply            # fix what the guard just blocked
+```
+
+Safety rules:
+- a recipe only runs on a line where **that same bug's** signature matches;
+- files outside the repo are refused;
+- if the tests fail after patching, **every file is restored**;
+- a fix only counts once the re-scan shows the signature is gone.
+
+Lines that match a bug with no recipe are listed as *needs a human or Bob*. Always review the diff and add a regression test before committing: a recipe restores the historical fix, but only your tests prove it's right in the new context.
+
+**Prevent: stop the bug coming back.**
+
+```bash
+python bugvaccine.py guard install <repo>                # pre-commit hook (each developer, once)
+python bugvaccine.py rules <repo> -o .semgrep/bug-vaccine.yml   # lint rules for IDEs and CI
+python bugvaccine.py pr <repo> --base main --fail-on-new-risks  # CI blocks the merge
+```
+
+The guard reads `.bugvaccine/company-knowledge.json` (commit it), or the path given with `guard install --kb`. It refuses to install if there's no knowledge to check against, so it never silently guards nothing. Emergency bypass: `git commit --no-verify`. The Semgrep export hasn't been run through Semgrep itself in this project; check the rules on your codebase first.
+
 ## Debugging with company knowledge (the Debug lab)
 
 Every repo you vaccinate also teaches the **debugger**. In Phase 1, Bob gives each bug pattern a `signatures` block (what the risky code and the error look like, and how it was fixed). Merge them across the company:

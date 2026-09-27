@@ -23,6 +23,7 @@ CHUNKS = rag.build_index(rag.chunks_from_antigens(ROOT / "examples/mutants.examp
 CONFIG = {"redact": [[n, p, f, h] for n, p, f, h in redact.RULES],
           "nestedQuantifier": debug._NESTED_QUANTIFIER.pattern,
           "maxText": debug.MAX_TEXT, "maxLine": debug.MAX_LINE,
+          "extLang": debug.EXT_LANG, "codeExt": sorted(debug.CODE_EXT),
           "rag": {"stop": sorted(rag.STOP), "k1": rag.K1, "b": rag.B, "boost": rag.SIGNATURE_BOOST}}
 
 SAMPLES = {
@@ -36,6 +37,12 @@ SAMPLES = {
 }
 DIFF = (ROOT / "examples/debug-samples/pr-88.diff").read_text(encoding="utf-8")
 RISKY = [r"(a+)+$", r"(\w+)*x", r"\.slice\([^)]*[+-]\s*1\s*\)", r"(abc)+"]
+PATCH_SAMPLES = {
+    "new code": SAMPLES["new code"],
+    "crlf and blank lines": "// a\r\n\r\nreturn customer.address.city;\r\nconst p = xs.slice(0, n - 1); // y\n",
+    "no trailing newline": "total = lines.reduce((s, l) => s + l.price, 0)",
+    "fixed code": "return items.slice(start, start + size);\nreturn customer.address?.city ?? 'Unknown';\n",
+}
 
 NODE_SCRIPT = r"""
 const fs = require('fs');
@@ -50,6 +57,12 @@ for (const [name, text] of Object.entries(input.samples)) {
   out.redact[name] = E.redactText(text)[0];
 }
 out.diff = E.matchDiff(input.diff).findings.map(f => [f.file, f.line, f.a.key]);
+out.patch = {};
+for (const [name, text] of Object.entries(input.patchSamples)) {
+  const r = E.patchText(text, 'javascript');
+  out.patch[name] = {text: r.text, changes: r.changes.map(c => [c.line, c.key, c.before, c.after]),
+                     unpatched: r.unpatched.map(u => [u.line, u.key])};
+}
 for (const p of input.risky) out.risky[p] = E.riskyRegex(p);
 process.stdout.write(JSON.stringify(out));
 """
@@ -60,7 +73,7 @@ class JsPythonParity(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         payload = {"engine": str(ROOT / "vaccine/web/engine.js"), "kb": KB["antigens"], "chunks": CHUNKS,
-                   "config": CONFIG, "samples": SAMPLES, "diff": DIFF, "risky": RISKY}
+                   "config": CONFIG, "samples": SAMPLES, "diff": DIFF, "risky": RISKY, "patchSamples": PATCH_SAMPLES}
         r = subprocess.run(["node", "-e", NODE_SCRIPT], input=json.dumps(payload), capture_output=True,
                            text=True, encoding="utf-8")
         if r.returncode:
@@ -91,6 +104,16 @@ class JsPythonParity(unittest.TestCase):
         py = [[f["file"], f["line"], f["key"]] for f in debug.match_diff(DIFF, KB)]
         self.assertEqual(self.js["diff"], py)
         self.assertTrue(py, "the sample diff should produce findings")
+
+    def test_patching_is_identical(self):
+        import patch
+        for name, text in PATCH_SAMPLES.items():
+            with self.subTest(sample=name):
+                new, changes, unpatched = patch.patch_text(text, KB, "javascript")
+                py = {"text": new, "changes": [[c["line"], c["key"], c["before"], c["after"]] for c in changes],
+                      "unpatched": [[u["line"], u["key"]] for u in unpatched]}
+                self.assertEqual(self.js["patch"][name], py)
+        self.assertEqual(len(self.js["patch"]["new code"]["changes"]), 3)
 
     def test_redos_check_is_identical(self):
         for p in RISKY:

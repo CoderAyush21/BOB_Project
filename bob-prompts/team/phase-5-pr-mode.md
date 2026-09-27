@@ -19,6 +19,10 @@ This phase shows Bug Vaccine in the **code review** workflow: when a pull reques
    - **new code vs. company bug history** (should flag `loyalty.js`, which repeats known bugs),
    - **tests vs. past bugs** in the changed files (should flag the untested `refunds.js`).
    Copy `demo-repo/.bugvaccine/pr-comment.md` and `demo-repo/.bugvaccine/results-pr.json` to `bob-output/`, and show the comment.
-8. 📸 `-Name p5-<MEMBER>-pr-comment` with `bob-output/pr-comment.md` open.
-9. Switch back: `git -C demo-repo checkout main`.
-10. Write your log (which past bugs the PR repeats, and how the comment would help a reviewer), commit, and finish as the shared rules describe.
+8. **Cure and prevent:**
+   - `python bugvaccine.py patch demo-repo --base main --kb bob-output/knowledge.json --apply --test "npm test --silent" --report bob-output/patch-report.json`: applies the company's own past fixes to the repeated bugs, re-runs the tests (rolled back if they fail) and re-scans. For any line reported as *needs a human or Bob*, write the fix yourself, then add a `patches` recipe to that antigen so it's automatic next time.
+   - Commit the fix, then install the guard: copy `bob-output/knowledge.json` to `demo-repo/.bugvaccine/company-knowledge.json` and run `python bugvaccine.py guard install demo-repo`. Show that committing a new copy of bug #41 (e.g. `xs.slice(0, 0 + n - 1)`) is **blocked**.
+   - Export lint rules for IDEs and CI: `python bugvaccine.py rules --kb bob-output/knowledge.json -o bob-output/bug-vaccine.semgrep.yml`.
+9. 📸 `-Name p5-<MEMBER>-pr-comment` with `bob-output/pr-comment.md` open, and `-Name p5-<MEMBER>-guard-blocked` showing the blocked commit.
+10. Switch back: `git -C demo-repo checkout main`.
+11. Write your log (which past bugs the PR repeats, what was patched automatically, what needed you, and the blocked commit), commit, and finish as the shared rules describe.

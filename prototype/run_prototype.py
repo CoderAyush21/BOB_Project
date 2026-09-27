@@ -22,7 +22,7 @@ OUT = ROOT / "prototype-output"
 REPO = OUT / "demo-repo"
 PY = sys.executable
 BAR = "─" * 72
-STEPS = 8
+STEPS = 9
 # Call the test runner directly: `npm test` adds ~1.5 s of npm start-up to every one of ~25 runs.
 TEST = "node --test"
 
@@ -144,6 +144,52 @@ def main():
     for line in (OUT / "pr-comment.md").read_text(encoding="utf-8").splitlines():
         print(f"   │ {line}")
     print("   └─────────────────────────────────────────────────────────────────")
+    pause("Bug Vaccine found them. Now cure them, and stop them coming back.")
+
+    step(9, "tool", "Cure & prevent: apply the company's own past fixes, then guard every future commit")
+    kb_path = str(OUT / "knowledge.json")
+    cure = {}
+    print("   Cure: patch the PR with the fixes the team already wrote (tests must still pass)\n")
+    sh(PY, "bugvaccine.py", "patch", str(REPO), "--base", "main", "--kb", kb_path, "--apply", "--test", TEST,
+       "--report", str(OUT / "patch-report.json"))
+    cure["patch"] = load(OUT / "patch-report.json")
+    git("commit", "-q", "-am", "fix: apply the company's known fixes for #41 #57 #63")
+    subprocess.run([PY, "bugvaccine.py", "pr", str(REPO), "--base", "main", "--kb", kb_path,
+                    "-o", "results-pr-after.json"], cwd=ROOT, check=True, capture_output=True)
+    after_pr = load(REPO / ".bugvaccine/results-pr-after.json")
+    cure["pr_after"] = {"new_code": len(after_pr.get("new_code") or []),
+                        "untested": after_pr["total"] - after_pr["killed"], "total": after_pr["total"]}
+    print(f"\n   Re-check PR #88: {cure['pr_after']['new_code']} added lines repeat known bugs now "
+          f"(was {len(pr.get('new_code') or [])}).")
+
+    print("\n   Prevent: install the pre-commit guard, then try to commit a new copy of bug #41")
+    # where a company keeps its knowledge base: committed at .bugvaccine/company-knowledge.json
+    shutil.copy(OUT / "knowledge.json", REPO / ".bugvaccine/company-knowledge.json")
+    subprocess.run([PY, "bugvaccine.py", "guard", "install", str(REPO)], cwd=ROOT, check=True, capture_output=True)
+    bad = "export const firstPage = (xs, n) => xs.slice(0, 0 + n - 1);\n"
+    (REPO / "src/paging2.js").write_text(bad, encoding="utf-8")
+    git("add", "-A")
+    attempt = subprocess.run(["git", "commit", "-m", "feat: paging helper"], cwd=REPO, capture_output=True,
+                             text=True, encoding="utf-8", errors="replace")
+    blocked = attempt.returncode != 0
+    cure["guard"] = {"blocked": blocked, "file": "src/paging2.js", "line": bad.strip(),
+                     "output": (attempt.stdout + attempt.stderr).strip()[-1500:]}
+    print(f"   {'BLOCKED' if blocked else 'NOT BLOCKED (unexpected)'}: git commit exited {attempt.returncode}")
+    for line in cure["guard"]["output"].splitlines()[:6]:
+        print(f"     {line}")
+    git("reset", "-q", "HEAD", "src/paging2.js")
+    (REPO / "src/paging2.js").unlink()
+    subprocess.run([PY, "bugvaccine.py", "guard", "uninstall", str(REPO)], cwd=ROOT, capture_output=True)
+
+    rules = subprocess.run([PY, "bugvaccine.py", "rules", "--kb", kb_path, "-o", str(OUT / "bug-vaccine.semgrep.yml")],
+                           cwd=ROOT, check=True, capture_output=True, text=True).stdout
+    cure["rules"] = {"count": int(rules.split()[1]), "file": "bug-vaccine.semgrep.yml"}
+    print(f"\n   Prevent everywhere: exported {cure['rules']['count']} Semgrep rules for IDEs and CI "
+          f"(prototype-output/bug-vaccine.semgrep.yml)")
+    (OUT / "cure.json").write_text(json.dumps(cure, indent=2), encoding="utf-8")
+    # history, RAG and the dashboard describe the project's main line, not this PR branch
+    git("checkout", "-q", "main")
+
     # RAG index: the demo repo's fix commits and postmortem, plus both projects' learned bug patterns
     sh(PY, "bugvaccine.py", "index", str(REPO), "--source", f"invoice-kit={OUT / 'mutants.json'}",
        "--source", f"tomli={ROOT / 'case-studies/tomli/mutants.json'}", "-o", str(OUT / "rag-index.json"))
@@ -155,6 +201,7 @@ def main():
        "--project", f"invoice-kit={OUT / 'results-before.json'},{OUT / 'results-after.json'}",
        "--project", f"tomli={ROOT / 'case-studies/tomli/results-before.json'}",
        "--diff-sample", str(ROOT / "examples/debug-samples/pr-88.diff"),
+       "--cure", str(OUT / "cure.json"),
        "--web-fonts",   # demo data only, so loading IBM Plex from Google Fonts is fine here
        "-o", str(OUT / "dashboard.html"))
 
@@ -165,6 +212,11 @@ def main():
     new = len(pr.get("new_code") or [])
     print(f"   PR #88            {new} added line(s) repeat known company bugs; "
           f"{pr['total'] - pr['killed']} of {pr['total']} past bugs in changed files have no test")
+    fixed = sum(len(f["changes"]) for f in cure["patch"]["files"])
+    print(f"   Cure              {fixed} repeated bugs patched with the company's own fixes; tests "
+          f"{cure['patch']['tests']}; re-scan {'clean' if cure['patch']['verified'] else 'NOT clean'}")
+    print(f"   Prevent           guard {'blocked' if cure['guard']['blocked'] else 'did NOT block'} a new copy of bug #41; "
+          f"{cure['rules']['count']} Semgrep rules exported")
     print(f"   Tool time {time.time() - t0:.0f}s (excludes Bob's steps)")
     print(f"\n   Open the interactive dashboard:  start prototype-output/dashboard.html")
     print(BAR)

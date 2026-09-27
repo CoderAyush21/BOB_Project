@@ -10,6 +10,9 @@
   python bugvaccine.py learn <repo> [<repo> ...]     teach the debugger your company's bug patterns
   python bugvaccine.py debug --error "<text>"        match an error/report against company bugs
   git diff main | python bugvaccine.py debug --diff -   review a PR's new lines against company bugs
+  python bugvaccine.py patch <repo> --base main [--apply]   cure: apply the company's own past fixes
+  python bugvaccine.py guard install <repo>          prevent: block commits that repeat known bugs
+  python bugvaccine.py rules <repo>                  prevent: export bug knowledge as Semgrep rules
   python bugvaccine.py index <repo> [<repo> ...]     RAG: index history, postmortems, patterns, docs
   python bugvaccine.py ask "<question or error>"     RAG: cited company sources + grounded Bob prompt
 
@@ -241,7 +244,13 @@ def cmd_pr(a):
         diff = subprocess.run(["git", "diff", f"{a.base}...HEAD"], cwd=a.repo, capture_output=True,
                               text=True, encoding="utf-8", errors="replace").stdout
         new_code = debug.match_diff(diff, kb)
-        print(f"New code: {len(new_code)} added line(s) match known company bugs")
+        import patch
+        for f in new_code:   # attach the company's own past fix, when there's a recipe for it
+            fixed, changes, _ = patch.patch_text(f["text"], kb, debug.EXT_LANG.get(Path(f["file"]).suffix.lower()))
+            if changes:
+                f["fix"] = fixed
+        print(f"New code: {len(new_code)} added line(s) match known company bugs, "
+              f"{sum(1 for f in new_code if f.get('fix'))} with a known fix")
     else:
         print("New code: not checked (no knowledge base; see --kb)")
 
@@ -263,6 +272,112 @@ def cmd_pr(a):
         print(f"FAILED: {len(new_code)} added line(s) repeat known company bugs (--fail-on-new-risks).")
         code = code or 2
     sys.exit(code)
+
+
+def repo_spec(repo):
+    """This repo's own bug patterns (antigens.json, else mutants.json), or an empty spec."""
+    for n in ("antigens.json", "mutants.json"):
+        f = state_dir(repo) / n
+        if f.exists():
+            return json.loads(f.read_text(encoding="utf-8"))
+    return {"antigens": [], "mutants": []}
+
+
+def git_lines(repo, *args):
+    out = subprocess.run(["git", *args], cwd=repo, capture_output=True, text=True, encoding="utf-8", errors="replace")
+    return [l.strip() for l in out.stdout.splitlines() if l.strip()]
+
+
+def cmd_patch(a):
+    import patch
+    kb = load_kb(a.repo, a.kb, repo_spec(a.repo))
+    if not kb:
+        sys.exit("No bug knowledge with fix recipes found. Build one with `learn`, or pass --kb.")
+    if a.files:
+        files = a.files
+    elif a.staged:
+        files = git_lines(a.repo, "diff", "--cached", "--name-only", "--diff-filter=AM")
+    elif a.base:
+        files = git_lines(a.repo, "diff", "--name-only", "--diff-filter=AM", f"{a.base}...HEAD")
+    else:
+        sys.exit("Say which files to patch: list them, or use --base main (files changed on this branch) or --staged.")
+    cfg_path = state_dir(a.repo) / "config.json"
+    test_cmd = a.test or (json.loads(cfg_path.read_text(encoding="utf-8"))["test"] if cfg_path.exists() else None)
+    if a.apply and not test_cmd:
+        sys.exit("--apply needs a test command to verify the patch (--test, or run `init` first).")
+    report = patch.patch_files(a.repo, files, kb, apply=a.apply, test_cmd=test_cmd)
+    if a.report:
+        Path(a.report).write_text(json.dumps(report, indent=2), encoding="utf-8")
+
+    n_changes = sum(len(f["changes"]) for f in report["files"])
+    n_manual = sum(len(f["unpatched"]) for f in report["files"])
+    if not report["files"]:
+        print(f"No known company bugs in {len(files)} file(s). Nothing to patch.")
+        return
+    for f in report["files"]:
+        for c in f["changes"]:
+            print(f"{f['file']}:{c['line']}  {c['title']}\n  - {c['before']}\n  + {c['after']}\n    ({c['explain']})")
+        for u in f["unpatched"]:
+            print(f"{f['file']}:{u['line']}  {u['title']}: no fix recipe, needs a human or Bob.\n    {u['text']}\n    Hint: {u['fix_hint']}")
+    if a.diff:
+        print("".join(f["diff"] for f in report["files"]))
+    print(f"\n{n_changes} fix(es) from the company's own past fixes; {n_manual} line(s) need a human or Bob.")
+    if not a.apply:
+        print("Dry run: nothing was changed. Re-run with --apply to write, test and verify the patch.")
+        return
+    if report["rolled_back"]:
+        print("ROLLED BACK: the tests failed with the patch applied, so every file was restored.\n"
+              + report.get("test_output", ""))
+        sys.exit(2)
+    print(f"Applied. Tests: {report['tests'] or 'not run'}. "
+          f"Re-scan: {'bug signatures gone' if report['verified'] else 'still matching at ' + ', '.join(report['still_matching'])}.")
+    print("Review the change (git diff), add a regression test for each bug, and commit.")
+    sys.exit(0 if report["verified"] else 2)
+
+
+def cmd_guard(a):
+    import guard
+    if a.action == "install":
+        # a guard with nothing to check would silently let everything through: refuse instead
+        if not load_kb(a.repo, a.kb, repo_spec(a.repo)):
+            sys.exit("No bug knowledge to guard with. Put a knowledge base at .bugvaccine/company-knowledge.json "
+                     "(`learn ... -o`), give --kb, or add signatures to .bugvaccine/antigens.json.")
+        try:
+            hook = guard.install(a.repo, ROOT / "bugvaccine.py", kb=a.kb)
+        except ValueError as e:
+            sys.exit(str(e))
+        print(f"Installed {hook}\nCommits that repeat a known company bug will now be blocked "
+              f"(emergency bypass: git commit --no-verify).")
+    elif a.action == "uninstall":
+        print("Removed the Bug Vaccine pre-commit hook." if guard.uninstall(a.repo) else "No Bug Vaccine hook installed.")
+    else:  # check (what the hook runs)
+        kb = load_kb(a.repo, a.kb, repo_spec(a.repo))
+        if not kb:
+            print("bug-vaccine guard: no bug knowledge in .bugvaccine/, nothing to check.")
+            return
+        findings = guard.check(a.repo, kb)
+        if not findings:
+            return
+        print("bug-vaccine guard: this commit repeats bugs the company has already fixed:\n")
+        for f in findings:
+            hint = f["antigen"].get("signatures", {}).get("fix_hint", "")
+            print(f"  {f['file']}:{f['line']}  {f['antigen'].get('title')}\n    {f['text']}\n    {f['explain']}"
+                  + (f"\n    Fix: {hint}" if hint else ""))
+        print(f"\nAuto-fix what the company already knows how to fix:\n  {cli_hint()} patch . --staged --apply\n"
+              f"then `git add` the files and commit again. (Bypass in an emergency: git commit --no-verify)")
+        sys.exit(1)
+
+
+def cmd_rules(a):
+    import guard
+    kb = load_kb(a.repo, a.kb, repo_spec(a.repo)) if a.repo else json.loads(Path(a.kb).read_text(encoding="utf-8"))
+    if not kb:
+        sys.exit("No bug knowledge found. Build one with `learn`, or pass --kb.")
+    text, count = guard.semgrep_rules(kb)
+    out = Path(a.out)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_bytes(text.encode("utf-8"))
+    print(f"Wrote {count} Semgrep rule(s) to {out}. Run them with: semgrep --config {q(out)} .")
 
 
 def load_kb(repo, kb_path, spec):
@@ -438,6 +553,30 @@ def main():
             p.add_argument("--fail-on-new-risks", action="store_true",
                            help="exit 2 if added lines repeat known company bugs")
         p.set_defaults(fn=fn)
+
+    p = sub.add_parser("patch", help="cure: apply the company's own past fixes to code that repeats a known bug")
+    p.add_argument("repo")
+    p.add_argument("files", nargs="*", help="repo-relative files (or use --base / --staged)")
+    p.add_argument("--base", help="patch files changed on this branch since BASE")
+    p.add_argument("--staged", action="store_true", help="patch files staged for commit")
+    p.add_argument("--kb", help="knowledge base (default: .bugvaccine/company-knowledge.json, else this repo's patterns)")
+    p.add_argument("--apply", action="store_true", help="write the patch, run the tests (roll back on failure), re-scan")
+    p.add_argument("--test", help="test command (default: from .bugvaccine/config.json)")
+    p.add_argument("--diff", action="store_true", help="also print the unified diff")
+    p.add_argument("--report", help="write the patch report as JSON (used by the dashboard)")
+    p.set_defaults(fn=cmd_patch)
+
+    p = sub.add_parser("guard", help="prevent: pre-commit hook that blocks commits repeating known bugs")
+    p.add_argument("action", choices=["install", "uninstall", "check"])
+    p.add_argument("repo", nargs="?", default=".")
+    p.add_argument("--kb")
+    p.set_defaults(fn=cmd_guard)
+
+    p = sub.add_parser("rules", help="prevent: export bug knowledge as Semgrep rules for IDEs and CI")
+    p.add_argument("repo", nargs="?")
+    p.add_argument("--kb", default="knowledge.json")
+    p.add_argument("-o", "--out", default=".semgrep/bug-vaccine.yml")
+    p.set_defaults(fn=cmd_rules)
 
     p = sub.add_parser("index", help="RAG: index fix commits, postmortems, bug patterns and docs")
     p.add_argument("repos", nargs="*", help="repos to index; use name=path to set the project name")

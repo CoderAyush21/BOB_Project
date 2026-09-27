@@ -67,7 +67,8 @@ def learn(sources):
 
 def signature_regexes(a):
     s = a.get("signatures", {})
-    return [c["regex"] for c in s.get("code", [])] + list(s.get("errors", []))
+    return ([c["regex"] for c in s.get("code", [])] + list(s.get("errors", []))
+            + [p["regex"] for p in s.get("patches", [])])
 
 
 # ── matching ───────────────────────────────────────────────────────────────
@@ -120,6 +121,16 @@ EXT_LANG = {".py": "python", ".js": "javascript", ".mjs": "javascript", ".cjs": 
             ".ts": "javascript", ".tsx": "javascript", ".java": "java", ".go": "go"}
 
 
+# Diff review only looks at source code. Docs, JSON (including Bug Vaccine's own knowledge files,
+# whose example "before" lines are bugs on purpose) and other data files are skipped.
+CODE_EXT = set(EXT_LANG) | {".rb", ".php", ".cs", ".kt", ".rs", ".c", ".h", ".cpp", ".hpp", ".swift", ".scala", ".vue", ".svelte"}
+
+
+def is_code_file(path):
+    p = Path(path)
+    return p.suffix.lower() in CODE_EXT and ".bugvaccine" not in p.parts
+
+
 def is_diff(text):
     return bool(re.search(r"^(diff --git |@@ -\d+(,\d+)? \+\d+(,\d+)? @@)", text, re.M))
 
@@ -150,6 +161,8 @@ def match_diff(text, kb):
     """Check only the lines a diff ADDS against code signatures. Returns [{file, line, text, explain, antigen}]."""
     findings = []
     for path, added in parse_diff(text).items():
+        if not is_code_file(path):
+            continue
         lang = EXT_LANG.get(Path(path).suffix.lower())
         for a in kb["antigens"]:
             s = a.get("signatures", {})

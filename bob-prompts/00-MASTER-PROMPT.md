@@ -75,6 +75,8 @@ You are the engineering agent for **Bug Vaccine**, our entry to the **IBM Bob 2.
    - `code` regexes describe the risky line; `errors` regexes describe the error message or bug report (from the fix commit, issue or postmortem).
    - Regexes must work in **both Python and JavaScript**: no `(?P<name>)`, no inline flags like `(?i)`, and no nested quantifiers such as `(a+)+`.
    - `code` regexes must **not** match today's fixed code. Check: `python bugvaccine.py learn --source invoice-kit=antigens.json -o knowledge.json`, then `python bugvaccine.py debug --kb knowledge.json --scan demo-repo/src/*.js` must report no code matches.
+   - Also add `"patches": [{"regex": "...", "replace": "... $1 ...", "explain": "..."}]`: a **fix recipe** that turns the buggy line into the fixed one, taken from the original fix commit. `replace` uses `$1`..`$9` for groups. Check it: `python bugvaccine.py patch demo-repo src/<file> --kb knowledge.json` must show the historical fix, and must change nothing in today's fixed code.
+
 6. 📸 `-Name 01-antigens` (with `antigens.json` open)
 ⏸ Stop.
 
@@ -111,8 +113,12 @@ You are the engineering agent for **Bug Vaccine**, our entry to the **IBM Bob 2.
    - **new code vs. company bug history** (should flag `loyalty.js`, which repeats known bugs),
    - **tests vs. past bugs** in the changed files (should flag the untested `refunds.js`).
    Copy `demo-repo/.bugvaccine/pr-comment.md` and `demo-repo/.bugvaccine/results-pr.json` to the project root, and show the comment.
-6. 📸 `-Name 05-pr-comment` (with `pr-comment.md` open in the editor)
-7. Switch back: `git -C demo-repo checkout main`.
+6. **Cure and prevent:**
+   - `python bugvaccine.py patch demo-repo --base main --kb knowledge.json --apply --test "npm test --silent" --report patch-report.json`: applies the company's own past fixes to the repeated bugs, re-runs the tests (rolled back if they fail) and re-scans. For any line reported as *needs a human or Bob*, write the fix yourself, then add a `patches` recipe to that antigen so it's automatic next time.
+   - Commit the fix, then install the guard: copy `knowledge.json` to `demo-repo/.bugvaccine/company-knowledge.json` and run `python bugvaccine.py guard install demo-repo`. Show that committing a new copy of bug #41 (e.g. `xs.slice(0, 0 + n - 1)`) is **blocked**.
+   - Export lint rules for IDEs and CI: `python bugvaccine.py rules --kb knowledge.json -o bug-vaccine.semgrep.yml`.
+7. 📸 `-Name 05-pr-comment` (with `pr-comment.md` open), and `-Name 05-guard-blocked` showing the blocked commit
+8. Switch back: `git -C demo-repo checkout main`.
 ⏸ Stop.
 
 ### Phase 6 — Write up and self-check

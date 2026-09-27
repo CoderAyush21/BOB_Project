@@ -15,6 +15,8 @@ Bug Vaccine reads a company's git history, runs its tests, rewrites its source f
 | Pasted stack traces and code | Sensitive text left in the browser | The Debug lab never saves pasted text; older saved input is deleted on load. Only patterns you explicitly add are stored locally. |
 | Availability | A regex with nested quantifiers such as `(a+)+` hangs the matcher (ReDoS) | `learn` rejects such regexes, the Debug lab refuses them in the teach form, and inputs are capped at 200 KB and 2,000 characters per line. |
 | Pull request comments | Text from mutants breaks out of code blocks, injects HTML or @mentions people | All comment text is redacted, backticks and HTML are neutralised, and @mentions are defused. |
+| Your code, when patching | An automatic fix rewrites code it shouldn't, or breaks the build | A recipe only runs on lines where that bug's own signature matches; `patch` is a dry run unless `--apply`; paths are contained to the repo; if the tests fail after patching, every file is restored; a fix only counts after a re-scan. |
+| Commit guard | A guard that silently checks nothing gives false confidence | `guard install` refuses without a knowledge base; it never overwrites another tool's hook; it only reviews source files, not docs or Bug Vaccine's own knowledge files (whose examples are bugs on purpose). |
 | Working tree | A crash leaves a mutated file behind | Every mutated file is restored in a `finally` block (including Ctrl+C), and `run` warns if files it will touch have uncommitted changes. |
 
 ## Things you still need to do

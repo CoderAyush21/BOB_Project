@@ -12,5 +12,9 @@
    - **new code vs. company bug history** (should flag `loyalty.js`, which repeats known bugs),
    - **tests vs. past bugs** in the changed files (should flag the untested `refunds.js`).
    Copy `demo-repo/.bugvaccine/pr-comment.md` and `demo-repo/.bugvaccine/results-pr.json` to the project root, and show the comment.
-6. Switch back: `git -C demo-repo checkout main`.
-7. Optional: write the missing antibody tests on the PR branch and re-run step 5 until the comment shows ✅.
+6. **Cure and prevent:**
+   - `python bugvaccine.py patch demo-repo --base main --kb knowledge.json --apply --test "npm test --silent" --report patch-report.json`: applies the company's own past fixes to the repeated bugs, re-runs the tests (rolled back if they fail) and re-scans. For any line reported as *needs a human or Bob*, write the fix yourself, then add a `patches` recipe to that antigen so it's automatic next time.
+   - Commit the fix, then install the guard: copy `knowledge.json` to `demo-repo/.bugvaccine/company-knowledge.json` and run `python bugvaccine.py guard install demo-repo`. Show that committing a new copy of bug #41 (e.g. `xs.slice(0, 0 + n - 1)`) is **blocked**.
+   - Export lint rules for IDEs and CI: `python bugvaccine.py rules --kb knowledge.json -o bug-vaccine.semgrep.yml`.
+7. Switch back: `git -C demo-repo checkout main`.
+8. Optional: write the missing antibody tests on the PR branch and re-run step 5 until the comment shows ✅.
