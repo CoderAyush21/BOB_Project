@@ -1,4 +1,4 @@
-"""Block pushes that would leak credentials (the hackathon suspends IBM Cloud accounts whose keys
+﻿"""Block pushes that would leak credentials (the hackathon suspends IBM Cloud accounts whose keys
 are found in a repo).
 
     python tools/secret_scan.py            # scan what's staged for commit (git diff --cached)
@@ -19,7 +19,7 @@ sys.path.insert(0, str(ROOT / "vaccine"))
 import redact  # noqa: E402
 
 STRONG = {"private-key", "aws-access-key", "github-token", "slack-token", "jwt", "url-credentials"}
-FAKE_OK = re.compile(r"^(tests|examples|docs)/")
+FAKE_OK = re.compile(r"^(tests|examples|docs)/|^\.env\.example$")
 IBM_KEY = re.compile(r"\b(?:ibm[_-]?cloud[_-]?)?api[_-]?key\b[\"']?\s*[:=]\s*[\"']?([A-Za-z0-9_-]{40,48})", re.I)
 
 
