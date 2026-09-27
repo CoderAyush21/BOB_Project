@@ -101,4 +101,4 @@ The fix (in `vaccine/patch.py`) makes `patch` touch only source-code files, neve
 |---|---|---|---|
 | Asmi | 1–2 | Setup and template merge; reading the fix history and postmortem to extract the bug patterns (document understanding) | `bob_sessions/Prompt 1 summary - Asmi.png`, `bob_sessions/Prompt 2 summary - Asmi.png` |
 | Ayush | 3–4 | Parallel subagents hunting for re-entry points; Agent mode writing the antibody tests (33% → 100%) | `bob_sessions/Prompt 3 summary - Ayush.png`, `bob_sessions/Prompt 4 summary - Ayush.png` |
-| Biraj | 5–7 | Blind held-out check in a fresh session; PR review, cure and prevent; verification, dashboard and write-up | `bob_sessions/Prompt 5 summary - Biraj.png` → `bob_sessions/Prompt 7 summary - Biraj.png` |
+| Biraj | 5–8 | Blind held-out check in a fresh session; PR review, cure and prevent; verification, dashboard and write-up; Prompt 8: independent review and verification of the post-run patch fix, and final deliverables check | `bob_sessions/Prompt 5 summary - Biraj.png` → `bob_sessions/Prompt 7 summary - Biraj.png`, `bob_sessions/Prompt 8 summary - Biraj.png` |

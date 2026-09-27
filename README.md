@@ -8,6 +8,8 @@
 
 # Bug Vaccine
 
+**▶ [Watch the demo video](https://youtu.be/gV39HRti6cA)**
+
 > **Every codebase remembers its own mistakes. Bug Vaccine makes sure it never repeats them.**
 
 An IBM Bob 2.0 Hackathon project (lablab.ai). IBM Bob 2.0 runs the AI steps; deterministic scripts do the measuring.
