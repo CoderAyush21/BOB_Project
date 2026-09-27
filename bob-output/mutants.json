@@ -1,13 +1,4 @@
 {
-  "version": 1,
-  "generated": "2026-09-27 13:07",
-  "sources": [
-    {
-      "name": "invoice-kit",
-      "antigens": 3,
-      "with_signatures": 3
-    }
-  ],
   "antigens": [
     {
       "id": "A41",
@@ -33,7 +24,7 @@
         "fix_hint": "The end index of slice() is exclusive, so use slice(start, start + size) with no - 1.",
         "example": {
           "before": "return items.slice(start, start + size - 1);",
-          "after": "return items.slice(start, start + size);"
+          "after":  "return items.slice(start, start + size);"
         },
         "antibody": "test('regression #41: full pages keep their last item', () => { assert.deepEqual(page([1,2,3,4,5], 0, 2), [1,2]); assert.deepEqual(page([1,2,3,4,5], 2, 2), [5]); });",
         "patches": [
@@ -43,9 +34,7 @@
             "explain": "drop the '- 1': slice()'s end index is already exclusive (the #41 fix)"
           }
         ]
-      },
-      "repo": "invoice-kit",
-      "key": "invoice-kit:A41"
+      }
     },
     {
       "id": "A57",
@@ -74,7 +63,7 @@
         "fix_hint": "Guard the nested object with ?. (the #57 fix); add a sensible default if the caller needs one.",
         "example": {
           "before": "return customer.address.city;",
-          "after": "return customer.address?.city ?? 'Unknown';"
+          "after":  "return customer.address?.city ?? 'Unknown';"
         },
         "antibody": "test('regression #57: billingCity survives no address', () => { assert.equal(billingCity({}), 'Unknown'); assert.equal(billingCity({address: {city: 'NYC'}}), 'NYC'); });",
         "patches": [
@@ -84,9 +73,7 @@
             "explain": "guard the nested object with ?. (the #57 fix); add a sensible default if the caller needs one"
           }
         ]
-      },
-      "repo": "invoice-kit",
-      "key": "invoice-kit:A57"
+      }
     },
     {
       "id": "A63",
@@ -113,7 +100,7 @@
         "fix_hint": "Sum in integer cents and divide once (the #63 fix).",
         "example": {
           "before": "return lines.reduce((sum, l) => sum + l.price * l.qty, 0);",
-          "after": "const cents = lines.reduce((sum, l) => sum + Math.round(l.price * 100) * l.qty, 0);\n  return cents / 100;"
+          "after":  "const cents = lines.reduce((sum, l) => sum + Math.round(l.price * 100) * l.qty, 0);\n  return cents / 100;"
         },
         "antibody": "test('regression #63: no float drift', () => { assert.equal(invoiceTotal([{price: 0.1, qty: 1}, {price: 0.2, qty: 1}]), 0.3); });",
         "patches": [
@@ -128,9 +115,57 @@
             "explain": "sum in integer cents and divide once (the #63 fix) — single-field variant"
           }
         ]
-      },
-      "repo": "invoice-kit",
-      "key": "invoice-kit:A63"
+      }
+    }
+  ],
+  "mutants": [
+    {
+      "id": "M1",
+      "antigen": "A41",
+      "file": "src/paginate.js",
+      "find": "return items.slice(start, start + size);",
+      "replace": "return items.slice(start, start + size - 1);",
+      "why": "#41 Off-by-one in slice end — exact revert of the original fix in paginate.js; drops the last item of every page"
+    },
+    {
+      "id": "M2",
+      "antigen": "A41",
+      "file": "src/reports.js",
+      "find": "return rows.slice(from, from + perPage);",
+      "replace": "return rows.slice(from, from + perPage - 1);",
+      "why": "#41 Off-by-one in slice end — same pattern re-introduced in reportPage() in reports.js, which was written after the original fix"
+    },
+    {
+      "id": "M3",
+      "antigen": "A57",
+      "file": "src/customers.js",
+      "find": "return customer.address?.city ?? 'Unknown';",
+      "replace": "return customer.address.city;",
+      "why": "#57 Missing null guard — exact revert of the fix in customers.js; crashes when customer has no address object, the exact SEV-2 failure"
+    },
+    {
+      "id": "M4",
+      "antigen": "A57",
+      "file": "src/reports.js",
+      "find": "const city = customer.shipping?.city ?? 'Unknown';",
+      "replace": "const city = customer.shipping.city;",
+      "why": "#57 Missing null guard — same pattern in shippingLabel() in reports.js (written after the fix); postmortem follow-up to audit nested-field accesses was never done"
+    },
+    {
+      "id": "M5",
+      "antigen": "A63",
+      "file": "src/money.js",
+      "find": "const cents = lines.reduce((sum, l) => sum + Math.round(l.price * 100) * l.qty, 0);\n  return cents / 100;",
+      "replace": "return lines.reduce((sum, l) => sum + l.price * l.qty, 0);",
+      "why": "#63 Float money math — exact revert of the fix in money.js; sums prices as IEEE 754 floats, reintroducing rounding drift"
+    },
+    {
+      "id": "M6",
+      "antigen": "A63",
+      "file": "src/reports.js",
+      "find": "const cents = lines.reduce((sum, l) => sum + Math.round(l.amount * rate * 100), 0);\n  return cents / 100;",
+      "replace": "return lines.reduce((sum, l) => sum + l.amount * rate, 0);",
+      "why": "#63 Float money math — same pattern in taxTotal() in reports.js (written after the fix); sums tax-adjusted amounts as floats"
     }
   ]
 }
