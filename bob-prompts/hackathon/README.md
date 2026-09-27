@@ -12,6 +12,6 @@ Paste them into IBM Bob **one at a time, in order** (Agent mode, with the `bug-v
 | 6 | [Code review, cure and prevent](prompt-6-pr-cure.md) | Subagents + Agent mode | Business Value, full solution |
 | 7 | [Verify, write up and publish](prompt-7-writeup.md) | Orchestration and verification | Presentation |
 
-**After each prompt:** screenshot Bob's task session summary (Win+Shift+S) and save it as `screenshots/manual/prompt-N-summary.png`. The next prompt commits it. The hackathon requires these, from every team member.
+**After each prompt:** screenshot Bob's task session summary (Win+Shift+S) and save it as `bob_sessions/prompt-N-summary.png`. The next prompt commits it. The hackathon requires these, from every team member.
 
-**Pushing:** the first push may open a GitHub sign-in window (Git Credential Manager). Bob never force-pushes, and every push is preceded by `python tools/secret_scan.py`.
+**Pushing:** the first push may open a GitHub sign-in window (Git Credential Manager). Bob never force-pushes, and every push is preceded by `python tools/leak_scan.py`.

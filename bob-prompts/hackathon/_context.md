@@ -3,7 +3,7 @@
 ## The challenge you are part of
 **IBM Bob 2.0 Hackathon (lablab.ai).** Build, *using IBM Bob 2.0*, a working prototype that improves a specific developer workflow (here: **testing, debugging, code review and application maintenance**), using **Agent mode, parallel tasks, subagents and document understanding** to manage multiple steps, not just assist with coding, and clearly demonstrate impact: less manual effort, fewer errors and less rework.
 Judging: **Application of Technology · Business Value · Originality · Presentation.**
-Required deliverables include IBM Bob task session summary screenshots and a public repository. **IBM Cloud credentials must never be committed.**
+Required deliverables include IBM Bob task session summary screenshots and exported session reports (in `bob_sessions/`, which the template requires) and a public repository. **IBM Cloud credentials must never be committed.**
 
 ## The product
 Bug Vaccine turns a repo's own bug history into protection:
@@ -31,12 +31,12 @@ Bug Vaccine turns a repo's own bug history into protection:
 
 ## Start of every prompt (except prompt 1)
 If I saved last prompt's session-summary screenshot, commit it first:
-`git add screenshots/manual; git commit -m "screenshots: session summary for the previous prompt"` (skip if there's nothing to commit).
+`git add bob_sessions; git commit -m "bob_sessions: session summary for the previous prompt"` (skip if there's nothing to commit).
 
 ## End of every prompt: scan, commit, push
 1. `git add -A`
-2. `python tools/secret_scan.py`. It **must** print `clean`. If it doesn't, **stop**, don't commit, and tell me which file and rule it reported (never print the value).
+2. `python tools/leak_scan.py`. It **must** print `clean`. If it doesn't, **stop**, don't commit, and tell me which file and rule it reported (never print the value).
 3. `git commit -m "Bob prompt N: <one-line summary>"`
 4. `git push origin main`. If the push is rejected, **never force-push**: run `git pull --no-rebase origin main`, resolve any conflict (keep both sides' content), run the scan again, and push. If it still fails, stop and show me the error.
 5. Finish with a 3–5 line summary, then tell me:
-   `✅ Prompt N done and pushed. Please screenshot my task session summary → screenshots/manual/prompt-N-summary.png, then paste prompt N+1.`
+   `✅ Prompt N done and pushed. Please screenshot my task session summary → bob_sessions/prompt-N-summary.png (and export the session report there if Bob offers it), then paste prompt N+1.`
