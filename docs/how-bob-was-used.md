@@ -95,6 +95,10 @@ The fix (in `vaccine/patch.py`) makes `patch` touch only source-code files, neve
 
 ## Team members' Bob sessions
 
-| Member | What they used Bob for | Screenshots |
-|---|---|---|
-| Sahil | Full 7-prompt run: setup, antigen extraction, parallel hunt, antibody writing, blind held-out check, PR review + cure + prevent, verification + dashboard | `bob_sessions/Prompt 1 summary.png` → `bob_sessions/Prompt 7 summary.png` |
+**All three team members used the same laptop for the IBM Bob run, taking turns**, which is why the seven prompts appear as one continuous run in one IBM Bob setup, with commits under that laptop's git identity. Who drove each prompt:
+
+| Member | Prompts | What they used Bob for | Screenshots |
+|---|---|---|---|
+| Asmi | 1–2 | Setup and template merge; reading the fix history and postmortem to extract the bug patterns (document understanding) | `bob_sessions/Prompt 1 summary - Asmi.png`, `bob_sessions/Prompt 2 summary - Asmi.png` |
+| Ayush | 3–4 | Parallel subagents hunting for re-entry points; Agent mode writing the antibody tests (33% → 100%) | `bob_sessions/Prompt 3 summary - Ayush.png`, `bob_sessions/Prompt 4 summary - Ayush.png` |
+| Biraj | 5–7 | Blind held-out check in a fresh session; PR review, cure and prevent; verification, dashboard and write-up | `bob_sessions/Prompt 5 summary - Biraj.png` → `bob_sessions/Prompt 7 summary - Biraj.png` |

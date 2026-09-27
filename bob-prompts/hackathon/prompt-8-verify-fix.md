@@ -1,6 +1,6 @@
 # Prompt 8: Verify the post-run fix and check the deliverables
 
-**Run this in a new Bob session.** Any team member can run it; a teammate who hasn't used Bob on this project yet should, because the hackathon wants session screenshots from **every** team member. Before pasting, replace `<YOUR NAME>` and, if you have it, `<VIDEO LINK>`.
+**Run this in a new Bob session.** Any team member can run it on the shared laptop; name the file after whoever drives it. Before pasting, replace `<YOUR NAME>` and, if you have it, `<VIDEO LINK>`.
 
 ---
 
