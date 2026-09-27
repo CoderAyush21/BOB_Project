@@ -1,0 +1,75 @@
+{
+  "antigens": [
+    {
+      "id": "A41",
+      "title": "#41 Off-by-one in slice end",
+      "pattern": "Using slice(start, start + n - 1) instead of slice(start, start + n), dropping the last item of every page"
+    },
+    {
+      "id": "A57",
+      "title": "#57 Missing null guard on nested customer field",
+      "pattern": "Reading a nested object property without an optional-chaining guard, crashing when the intermediate object is undefined or null"
+    },
+    {
+      "id": "A63",
+      "title": "#63 Float money math",
+      "pattern": "Summing currency values as IEEE 754 floats, causing rounding drift; fix is integer-cent accumulation"
+    }
+  ],
+  "mutants": [
+    {
+      "id": "H1",
+      "antigen": "A41",
+      "title": "Off-by-one: start index computed one too high",
+      "file": "src/paginate.js",
+      "find": "const start = pageNo * size;",
+      "replace": "const start = pageNo * size + 1;",
+      "description": "The start index is one too high, so the first item of every page is dropped. billingCity({}) would also fail. page([1,2,3,4,5],0,2) returns [2,3] instead of [1,2]."
+    },
+    {
+      "id": "H2",
+      "antigen": "A41",
+      "title": "Off-by-one: end index one too large, bleeds next page",
+      "file": "src/paginate.js",
+      "find": "return items.slice(start, start + size);",
+      "replace": "return items.slice(start, start + size + 1);",
+      "description": "The end index is one too large, so each page returns size+1 items. page([1,2,3,4,5],0,2) returns [1,2,3] instead of [1,2]."
+    },
+    {
+      "id": "H3",
+      "antigen": "A57",
+      "title": "Remove optional chaining, keep fallback",
+      "file": "src/customers.js",
+      "find": "customer.address?.city ?? 'Unknown'",
+      "replace": "customer.address.city ?? 'Unknown'",
+      "description": "Removes ?. so accessing .city on undefined address throws TypeError. billingCity({}) crashes instead of returning 'Unknown'."
+    },
+    {
+      "id": "H4",
+      "antigen": "A57",
+      "title": "Remove nullish fallback, keep optional chain",
+      "file": "src/customers.js",
+      "find": "return customer.address?.city ?? 'Unknown';",
+      "replace": "return customer.address?.city;",
+      "description": "Removes ?? 'Unknown' so absent address returns undefined instead of 'Unknown'. billingCity({}) returns undefined, breaking equality assertions."
+    },
+    {
+      "id": "H5",
+      "antigen": "A63",
+      "title": "Return raw cents instead of dividing by 100",
+      "file": "src/money.js",
+      "find": "return cents / 100;",
+      "replace": "return cents;",
+      "description": "Drops the /100 step so the function returns cent-integers (e.g. 30 instead of 0.30). invoiceTotal([{price:0.1,qty:1},{price:0.2,qty:1}]) returns 30 instead of 0.3."
+    },
+    {
+      "id": "H6",
+      "antigen": "A63",
+      "title": "Accumulate floats then scale — per-item rounding lost",
+      "file": "src/money.js",
+      "find": "const cents = lines.reduce((sum, l) => sum + Math.round(l.price * 100) * l.qty, 0);",
+      "replace": "const cents = lines.reduce((sum, l) => sum + l.price * l.qty, 0) * 100;",
+      "description": "Sums raw floats first then multiplies by 100. IEEE 754 drift accumulates before scaling: (0.1+0.2)*100/100 = 0.30000000000000004, not 0.3."
+    }
+  ]
+}
