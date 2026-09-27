@@ -1,4 +1,4 @@
-﻿# Prompt 1 log — Bob prompt 1: set up and connect bob_project
+# Prompt 1 log — Bob prompt 1: set up and connect bob_project
 
 ## What I did
 

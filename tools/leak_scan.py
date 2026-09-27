@@ -1,4 +1,4 @@
-﻿"""Block pushes that would leak credentials (the hackathon suspends IBM Cloud accounts whose keys
+"""Block pushes that would leak credentials (the hackathon suspends IBM Cloud accounts whose keys
 are found in a repo).
 
     python tools/leak_scan.py            # scan what's staged for commit (git diff --cached)

@@ -1,4 +1,3 @@
-﻿ HEAD
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="assets/logo/bug-vaccine-logo-dark.svg">
