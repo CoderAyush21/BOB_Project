@@ -125,3 +125,6 @@ antigens-raw.md
 /results*.json
 /report*.html
 prototype-output/
+
+# Vercel CLI link folder
+.vercel/

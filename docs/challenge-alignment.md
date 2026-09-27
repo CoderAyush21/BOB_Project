@@ -84,6 +84,7 @@ Verified by Bob (Prompt 8) against each lablab.ai required deliverable.
 | Written problem and solution statement | `docs/problem-and-solution.md` | ✅ |
 | Written statement on how IBM Bob was used | `docs/how-bob-was-used.md` | ✅ |
 | Code repository including IBM Bob task session summary screenshots | `bob_sessions/` contains 7 PNG screenshots (Prompts 1–7: Asmi 1–2, Ayush 3–4, Biraj 5–7); Prompt 8 screenshot to be added after this session | ✅ |
+| Live demo | https://bug-vaccine.vercel.app (static dashboard from Bob's results, `site/`) | ✅ (verified: 200; `/.env.local` 404) |
 | Publicly accessible link to the repository | https://github.com/CoderAyush21/BOB_Project | ✅ |
 | Each team member's screenshots of IBM Bob task session summaries | All three members shared one laptop and took turns; see `bob_sessions/README.md` for attribution. Asmi: `bob_sessions/Prompt 1 summary - Asmi.png`, `bob_sessions/Prompt 2 summary - Asmi.png`; Ayush: `bob_sessions/Prompt 3 summary - Ayush.png`, `bob_sessions/Prompt 4 summary - Ayush.png`; Biraj: `bob_sessions/Prompt 5 summary - Biraj.png` – `bob_sessions/Prompt 7 summary - Biraj.png` (Prompt 8 to follow) | ✅ |
 | No IBM Cloud credentials | `python tools/leak_scan.py` → `secret scan: clean` (verified in this prompt) | ✅ |

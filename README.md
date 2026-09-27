@@ -7,7 +7,7 @@
 
 # Bug Vaccine
 
-**▶ [Watch the demo video](https://youtu.be/gV39HRti6cA)**
+**▶ [Watch the demo video](https://youtu.be/gV39HRti6cA)** · **🌐 [Try the live dashboard](https://bug-vaccine.vercel.app)**
 
 > **Every codebase remembers its own mistakes. Bug Vaccine makes sure it never repeats them.**
 
