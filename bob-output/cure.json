@@ -1,0 +1,58 @@
+{
+  "patch": {
+    "files": [
+      {
+        "file": "src/loyalty.js",
+        "encoding": "utf-8",
+        "changes": [
+          {
+            "line": 5,
+            "before": "return entries.slice(from, from + perPage - 1);",
+            "after": "return entries.slice(from, from + perPage);",
+            "key": "invoice-kit:A41",
+            "title": "#41 Off-by-one in slice end",
+            "explain": "drop the '- 1': slice()'s end index is already exclusive (the #41 fix)"
+          },
+          {
+            "line": 9,
+            "before": "return entries.reduce((sum, e) => sum + e.amount, 0);",
+            "after": "const cents = entries.reduce((sum, e) => sum + Math.round(e.amount * 100), 0); return cents / 100;",
+            "key": "invoice-kit:A63",
+            "title": "#63 Float money math",
+            "explain": "sum in integer cents and divide once (the #63 fix)"
+          },
+          {
+            "line": 13,
+            "before": "return `Hello ${customer.profile.firstName}`;",
+            "after": "return `Hello ${customer.profile?.firstName}`;",
+            "key": "invoice-kit:A57",
+            "title": "#57 Missing null guard on nested customer field",
+            "explain": "guard the nested object with ?. (the #57 fix); add a sensible default if the caller needs one"
+          }
+        ],
+        "unpatched": [],
+        "diff": "--- a/src/loyalty.js\n+++ b/src/loyalty.js\n@@ -2,13 +2,13 @@\n // It repeats two bugs the company has already fixed elsewhere.\n export function statementPage(entries, pageNo, perPage) {\n   const from = pageNo * perPage;\n-  return entries.slice(from, from + perPage - 1);\n+  return entries.slice(from, from + perPage);\n }\n \n export function statementTotal(entries) {\n-  return entries.reduce((sum, e) => sum + e.amount, 0);\n+  const cents = entries.reduce((sum, e) => sum + Math.round(e.amount * 100), 0); return cents / 100;\n }\n \n export function greeting(customer) {\n-  return `Hello ${customer.profile.firstName}`;\n+  return `Hello ${customer.profile?.firstName}`;\n }\n"
+      }
+    ],
+    "applied": true,
+    "tests": "pass",
+    "rolled_back": false,
+    "verified": true,
+    "still_matching": []
+  },
+  "pr_after": {
+    "new_code": 0,
+    "untested": 2,
+    "total": 2
+  },
+  "guard": {
+    "blocked": true,
+    "file": "src/paging2.js",
+    "line": "export const firstPage = (xs, n) => xs.slice(0, 0 + n - 1);",
+    "output": "bug-vaccine guard: this commit repeats bugs the company has already fixed:\n  src/paging2.js:1  #41 Off-by-one in slice end\n    export const firstPage = (xs, n) => xs.slice(0, 0 + n - 1);\n    slice() call whose end argument is reduced by 1 - the end index is already exclusive, so this drops the last element\n    Fix: The end index of slice() is exclusive, so use slice(start, start + size) with no - 1."
+  },
+  "rules": {
+    "count": 3,
+    "file": "bug-vaccine.semgrep.yml"
+  }
+}

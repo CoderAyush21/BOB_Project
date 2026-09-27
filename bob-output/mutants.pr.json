@@ -1,0 +1,39 @@
+{
+  "antigens": [
+    {
+      "id": "A41",
+      "title": "#41 Off-by-one in slice end",
+      "pattern": "Using slice(start, start + n - 1) instead of slice(start, start + n), dropping the last item of every page"
+    },
+    {
+      "id": "A57",
+      "title": "#57 Missing null guard on nested customer field",
+      "pattern": "Reading a nested object property without an optional-chaining guard, crashing when the intermediate object is undefined or null"
+    },
+    {
+      "id": "A63",
+      "title": "#63 Float money math",
+      "pattern": "Summing currency values as IEEE 754 floats, causing rounding drift; fix is integer-cent accumulation"
+    }
+  ],
+  "mutants": [
+    {
+      "id": "P1",
+      "antigen": "A63",
+      "title": "Remove Math.round from refundTotal — float drift reintroduced",
+      "file": "src/refunds.js",
+      "find": "sum + Math.round(l.amount * 100)",
+      "replace": "sum + l.amount * 100",
+      "description": "Removes per-item integer rounding from refundTotal; fractional amounts accumulate as floats, reintroducing the #63 drift bug."
+    },
+    {
+      "id": "P2",
+      "antigen": "A57",
+      "title": "Remove optional chaining from refundContact — crashes on missing contact",
+      "file": "src/refunds.js",
+      "find": "customer.contact?.email",
+      "replace": "customer.contact.email",
+      "description": "Removes the ?. guard so refundContact throws TypeError when customer.contact is undefined or null, reintroducing the #57 crash bug."
+    }
+  ]
+}

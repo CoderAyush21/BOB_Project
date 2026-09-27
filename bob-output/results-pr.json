@@ -1,0 +1,80 @@
+{
+  "repo": "invoice-kit",
+  "label": "pull request",
+  "antigens": [
+    {
+      "id": "A41",
+      "title": "#41 Off-by-one in slice end",
+      "pattern": "Using slice(start, start + n - 1) instead of slice(start, start + n), dropping the last item of every page"
+    },
+    {
+      "id": "A57",
+      "title": "#57 Missing null guard on nested customer field",
+      "pattern": "Reading a nested object property without an optional-chaining guard, crashing when the intermediate object is undefined or null"
+    },
+    {
+      "id": "A63",
+      "title": "#63 Float money math",
+      "pattern": "Summing currency values as IEEE 754 floats, causing rounding drift; fix is integer-cent accumulation"
+    }
+  ],
+  "results": [
+    {
+      "id": "P1",
+      "antigen": "A63",
+      "title": "Remove Math.round from refundTotal \u2014 float drift reintroduced",
+      "file": "src/refunds.js",
+      "find": "sum + Math.round(l.amount * 100)",
+      "replace": "sum + l.amount * 100",
+      "description": "Removes per-item integer rounding from refundTotal; fractional amounts accumulate as floats, reintroducing the #63 drift bug.",
+      "status": "survived",
+      "seconds": 0.41
+    },
+    {
+      "id": "P2",
+      "antigen": "A57",
+      "title": "Remove optional chaining from refundContact \u2014 crashes on missing contact",
+      "file": "src/refunds.js",
+      "find": "customer.contact?.email",
+      "replace": "customer.contact.email",
+      "description": "Removes the ?. guard so refundContact throws TypeError when customer.contact is undefined or null, reintroducing the #57 crash bug.",
+      "status": "survived",
+      "seconds": 0.4
+    }
+  ],
+  "killed": 0,
+  "total": 2,
+  "timeouts": 0,
+  "invalid": 0,
+  "immunity": 0,
+  "new_code": [
+    {
+      "file": "src/loyalty.js",
+      "line": 5,
+      "text": "return entries.slice(from, from + perPage - 1);",
+      "explain": "slice() call whose end argument is reduced by 1 \u2014 the end index is already exclusive, so this drops the last element",
+      "key": "invoice-kit:A41",
+      "fix": "return entries.slice(from, from + perPage);",
+      "title": "#41 Off-by-one in slice end"
+    },
+    {
+      "file": "src/loyalty.js",
+      "line": 9,
+      "text": "return entries.reduce((sum, e) => sum + e.amount, 0);",
+      "explain": "reduce() accumulating a money field via direct property access (lowercase var.field, not Math.round) \u2014 float sum without integer-cent conversion",
+      "key": "invoice-kit:A63",
+      "fix": "const cents = entries.reduce((sum, e) => sum + Math.round(e.amount * 100), 0); return cents / 100;",
+      "title": "#63 Float money math"
+    },
+    {
+      "file": "src/loyalty.js",
+      "line": 13,
+      "text": "return `Hello ${customer.profile.firstName}`;",
+      "explain": "two-level property access on customer object without optional chaining \u2014 crashes if the intermediate object is undefined",
+      "key": "invoice-kit:A57",
+      "fix": "return `Hello ${customer.profile?.firstName}`;",
+      "title": "#57 Missing null guard on nested customer field"
+    }
+  ],
+  "comment_md": "### \ud83d\udc89 Bug Vaccine: \u26a0\ufe0f 5 past bugs could come back in this PR\n\n**New code vs. company bug history**\nLines this PR adds match bugs the company has already fixed:\n\n- `src/loyalty.js:5` **#41 Off-by-one in slice end** (invoice-kit): slice() call whose end argument is reduced by 1 \u2014 the end index is already exclusive, so this drops the last element\n  Suggested fix (the company's own past fix):\n  ```diff\n  - return entries.slice(from, from + perPage - 1);\n  + return entries.slice(from, from + perPage);\n  ```\n- `src/loyalty.js:9` **#63 Float money math** (invoice-kit): reduce() accumulating a money field via direct property access (lowercase var.field, not Math.round) \u2014 float sum without integer-cent conversion\n  Suggested fix (the company's own past fix):\n  ```diff\n  - return entries.reduce((sum, e) => sum + e.amount, 0);\n  + const cents = entries.reduce((sum, e) => sum + Math.round(e.amount * 100), 0); return cents / 100;\n  ```\n- `src/loyalty.js:13` **#57 Missing null guard on nested customer field** (invoice-kit): two-level property access on customer object without optional chaining \u2014 crashes if the intermediate object is undefined\n  Suggested fix (the company's own past fix):\n  ```diff\n  - return `Hello ${customer.profile.firstName}`;\n  + return `Hello ${customer.profile?.firstName}`;\n  ```\n\nApply every suggested fix, re-run the tests and re-check, in one step:\n```\npython bugvaccine.py patch . --base <base-branch> --apply\n```\n\n**Tests vs. past bugs in the changed files**\n0/2 caught. These past bugs could return and no test would notice:\n\n- **#63 Float money math** in `src/refunds.js`: \n  ```diff\n  - sum + Math.round(l.amount * 100)\n  + sum + l.amount * 100\n  ```\n- **#57 Missing null guard on nested customer field** in `src/refunds.js`: \n  ```diff\n  - customer.contact?.email\n  + customer.contact.email\n  ```\n\nSuggested: add a test that fails when the change above is applied.\n"
+}
